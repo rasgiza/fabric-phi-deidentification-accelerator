@@ -1,0 +1,44 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.hatch/
+
+# Test / coverage
+.pytest_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.hypothesis/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# ---------------------------------------------------------------------------
+# SECURITY: never commit secrets or real data.
+# The pepper lives ONLY in Azure Key Vault; crosswalk / PHI never touch Git.
+# ---------------------------------------------------------------------------
+*.env
+.env*
+*.pem
+*.key
+secrets.*
+**/xwalk_*
+**/*phi*.csv
+**/*phi*.parquet
+data/real/
+run_manifests/

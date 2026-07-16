@@ -1,0 +1,173 @@
+{
+  "name": "roster_safe",
+  "isHidden": true,
+  "visual": {
+    "visualType": "tableEx",
+    "query": {
+      "queryState": {
+        "Values": {
+          "projections": [
+            {
+              "queryRef": "gold_safe_dim_patient.PatientName",
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "gold_safe_dim_patient"
+                    }
+                  },
+                  "Property": "PatientName"
+                }
+              },
+              "nativeQueryRef": "PatientName"
+            },
+            {
+              "queryRef": "gold_safe_dim_patient.MRN",
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "gold_safe_dim_patient"
+                    }
+                  },
+                  "Property": "MRN"
+                }
+              },
+              "nativeQueryRef": "MRN"
+            },
+            {
+              "queryRef": "gold_safe_dim_patient.BirthYear",
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "gold_safe_dim_patient"
+                    }
+                  },
+                  "Property": "BirthYear"
+                }
+              },
+              "nativeQueryRef": "BirthYear"
+            },
+            {
+              "queryRef": "gold_safe_dim_patient.Age",
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "gold_safe_dim_patient"
+                    }
+                  },
+                  "Property": "Age"
+                }
+              },
+              "nativeQueryRef": "Age"
+            },
+            {
+              "queryRef": "gold_safe_dim_patient.Gender",
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "gold_safe_dim_patient"
+                    }
+                  },
+                  "Property": "Gender"
+                }
+              },
+              "nativeQueryRef": "Gender"
+            },
+            {
+              "queryRef": "gold_safe_dim_patient.Race",
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "gold_safe_dim_patient"
+                    }
+                  },
+                  "Property": "Race"
+                }
+              },
+              "nativeQueryRef": "Race"
+            },
+            {
+              "queryRef": "gold_safe_dim_patient.Ethnicity",
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "gold_safe_dim_patient"
+                    }
+                  },
+                  "Property": "Ethnicity"
+                }
+              },
+              "nativeQueryRef": "Ethnicity"
+            },
+            {
+              "queryRef": "gold_safe_dim_patient.ZIP",
+              "field": {
+                "Column": {
+                  "Expression": {
+                    "SourceRef": {
+                      "Entity": "gold_safe_dim_patient"
+                    }
+                  },
+                  "Property": "ZIP"
+                }
+              },
+              "nativeQueryRef": "ZIP"
+            }
+          ]
+        }
+      }
+    },
+    "objects": {},
+    "drillFilterOtherVisuals": true,
+    "visualContainerObjects": {
+      "title": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "true"
+                }
+              }
+            },
+            "text": {
+              "expr": {
+                "Literal": {
+                  "Value": "'Patient Roster (DE-IDENTIFIED)'"
+                }
+              }
+            }
+          }
+        }
+      ],
+      "subTitle": [
+        {
+          "properties": {
+            "show": {
+              "expr": {
+                "Literal": {
+                  "Value": "false"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "position": {
+    "x": 20,
+    "y": 264,
+    "z": 0,
+    "width": 1224,
+    "height": 420,
+    "tabOrder": 0
+  },
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.9.0/schema.json"
+}

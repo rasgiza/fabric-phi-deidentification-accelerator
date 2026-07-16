@@ -1,0 +1,83 @@
+table gold_safe_fact_encounter
+	lineageTag: d0d4c2a6-3e93-4ad3-8809-7701e275d518
+
+	measure 'Total Encounters' = COUNTROWS ( gold_safe_fact_encounter )
+		formatString: #,0
+		displayFolder: KPIs
+		lineageTag: bf17ed8b-4e31-4a73-966e-03149a23cb76
+
+	column EncounterKey
+		dataType: int64
+		isHidden
+		isKey
+		lineageTag: 44033d0e-089f-4bba-92fa-8e549db51606
+		summarizeBy: none
+		sourceColumn: EncounterKey
+
+	column PatientKey
+		dataType: int64
+		isHidden
+		lineageTag: ea3f5eed-d11f-40b8-9936-33281fc69030
+		summarizeBy: none
+		sourceColumn: PatientKey
+
+	column AttendingProviderKey
+		dataType: int64
+		isHidden
+		lineageTag: 2a89a6ef-46de-44af-8425-b6fe65e9c129
+		summarizeBy: none
+		sourceColumn: AttendingProviderKey
+
+	column ReferringProviderKey
+		dataType: int64
+		isHidden
+		lineageTag: de8181db-877a-4b69-8f40-1da51b3e1dd3
+		summarizeBy: none
+		sourceColumn: ReferringProviderKey
+
+	column DepartmentKey
+		dataType: int64
+		isHidden
+		lineageTag: 2040df9a-3a78-4a27-9055-d41ea404e86d
+		summarizeBy: none
+		sourceColumn: DepartmentKey
+
+	column LocationKey
+		dataType: int64
+		isHidden
+		lineageTag: c40eba2f-0353-4fec-90a6-ff4be9809f65
+		summarizeBy: none
+		sourceColumn: LocationKey
+
+	column DiagnosisKey
+		dataType: int64
+		isHidden
+		lineageTag: c497e46d-17c4-43d7-b222-607e045e8085
+		summarizeBy: none
+		sourceColumn: DiagnosisKey
+
+	column EncounterType
+		dataType: string
+		lineageTag: 8fc5aeb2-21e3-4245-bc2e-990f01c1bfde
+		summarizeBy: none
+		sourceColumn: EncounterType
+
+	column LengthOfStay
+		dataType: int64
+		lineageTag: 716883db-8d46-4e9d-916b-71dae526259a
+		summarizeBy: none
+		sourceColumn: LengthOfStay
+
+	column EncounterYear
+		dataType: int64
+		lineageTag: c8f46ae2-1cd3-410e-85ee-0fa06883fea5
+		summarizeBy: none
+		sourceColumn: EncounterYear
+
+	partition gold_safe_fact_encounter = entity
+		mode: directLake
+		source
+			entityName: gold_safe_fact_encounter
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+

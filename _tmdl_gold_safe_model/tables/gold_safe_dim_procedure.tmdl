@@ -1,0 +1,36 @@
+table gold_safe_dim_procedure
+	lineageTag: 96420394-da6e-4a46-bcd1-39040d64abff
+
+	column ProcedureKey
+		dataType: int64
+		isHidden
+		isKey
+		lineageTag: 66b0955d-abf6-4071-ad2f-b0ecfe9289e5
+		summarizeBy: none
+		sourceColumn: ProcedureKey
+
+	column ProcedureCode
+		dataType: string
+		lineageTag: 2801cf05-aa52-48fe-9464-bdcbc7036690
+		summarizeBy: none
+		sourceColumn: ProcedureCode
+
+	column CodeType
+		dataType: string
+		lineageTag: 13ba3fd6-3560-40e5-9837-0f27d8e432fe
+		summarizeBy: none
+		sourceColumn: CodeType
+
+	column ProcedureDescription
+		dataType: string
+		lineageTag: 79421950-4b1a-4b03-8a79-85e57b21ce23
+		summarizeBy: none
+		sourceColumn: ProcedureDescription
+
+	partition gold_safe_dim_procedure = entity
+		mode: directLake
+		source
+			entityName: gold_safe_dim_procedure
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+

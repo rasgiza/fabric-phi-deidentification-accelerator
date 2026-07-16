@@ -1,0 +1,132 @@
+table gold_safe_fact_claim
+	lineageTag: 111b2732-5d8d-4ccd-ab8d-7fc15937fc14
+
+	measure 'Total Billed' = SUM ( gold_safe_fact_claim[BilledAmount] )
+		formatString: \$#,0
+		displayFolder: KPIs
+		lineageTag: d399e983-37fe-45e0-a4e0-322f30be55d2
+
+	measure 'Total Paid' = SUM ( gold_safe_fact_claim[PaidAmount] )
+		formatString: \$#,0
+		displayFolder: KPIs
+		lineageTag: a9420e93-9d53-4274-915e-f0829c47fc5e
+
+	measure 'Denial Rate %' =
+			DIVIDE (
+			    CALCULATE ( COUNTROWS ( gold_safe_fact_claim ), gold_safe_fact_claim[DeniedFlag] = TRUE () ),
+			    COUNTROWS ( gold_safe_fact_claim )
+			)
+		formatString: 0.0%
+		displayFolder: KPIs
+		lineageTag: 01e459db-fada-4bd7-935f-cd3605048b75
+
+	column ClaimKey
+		dataType: int64
+		isHidden
+		isKey
+		lineageTag: 10d6f675-dfa9-48be-843a-0768a45d9039
+		summarizeBy: none
+		sourceColumn: ClaimKey
+
+	column PatientKey
+		dataType: int64
+		isHidden
+		lineageTag: 246f044e-eddf-492d-944d-1ba839e2e109
+		summarizeBy: none
+		sourceColumn: PatientKey
+
+	column BillingProviderKey
+		dataType: int64
+		isHidden
+		lineageTag: f6e057c5-5492-4885-a7c6-9589b7777f77
+		summarizeBy: none
+		sourceColumn: BillingProviderKey
+
+	column RenderingProviderKey
+		dataType: int64
+		isHidden
+		lineageTag: 014a6d94-bc0d-4b19-a73c-9bc10100f605
+		summarizeBy: none
+		sourceColumn: RenderingProviderKey
+
+	column PayerKey
+		dataType: int64
+		isHidden
+		lineageTag: ab372ade-bd8c-4181-a3e0-092b8f4b8556
+		summarizeBy: none
+		sourceColumn: PayerKey
+
+	column ProcedureKey
+		dataType: int64
+		isHidden
+		lineageTag: 3aab0839-136e-4f09-92c2-489092ee0365
+		summarizeBy: none
+		sourceColumn: ProcedureKey
+
+	column DiagnosisKey
+		dataType: int64
+		isHidden
+		lineageTag: 71f8a58a-7b14-4250-944f-bb44991ebb56
+		summarizeBy: none
+		sourceColumn: DiagnosisKey
+
+	column BilledAmount
+		dataType: double
+		formatString: \$#,0.00
+		lineageTag: 70a13771-992f-4f1b-9b11-30762f842ee4
+		summarizeBy: none
+		sourceColumn: BilledAmount
+
+	column AllowedAmount
+		dataType: double
+		formatString: \$#,0.00
+		lineageTag: 61dfbec7-b2c1-4f3f-b0fa-d9829ef9923f
+		summarizeBy: none
+		sourceColumn: AllowedAmount
+
+	column PaidAmount
+		dataType: double
+		formatString: \$#,0.00
+		lineageTag: 7452a5f6-33e4-4518-917d-318a33e4b8b9
+		summarizeBy: none
+		sourceColumn: PaidAmount
+
+	column PatientResponsibility
+		dataType: double
+		formatString: \$#,0.00
+		lineageTag: 3441ffc1-f3e0-4831-85ee-7b1de40dd0a4
+		summarizeBy: none
+		sourceColumn: PatientResponsibility
+
+	column AllowedVariance
+		dataType: double
+		formatString: \$#,0.00
+		lineageTag: 8fa13fc2-025a-4467-8e0e-2dd89845308d
+		summarizeBy: none
+		sourceColumn: AllowedVariance
+
+	column ClaimStatus
+		dataType: string
+		lineageTag: 8c5ed7d5-1e75-4b6c-b47f-217a8c8b668c
+		summarizeBy: none
+		sourceColumn: ClaimStatus
+
+	column DeniedFlag
+		dataType: boolean
+		lineageTag: 42b065a5-5ec9-4878-b3f8-b5d0232c1c62
+		summarizeBy: none
+		sourceColumn: DeniedFlag
+
+	column ServiceYear
+		dataType: int64
+		lineageTag: 4559b9db-0005-4dd8-a01c-be298e00801f
+		summarizeBy: none
+		sourceColumn: ServiceYear
+
+	partition gold_safe_fact_claim = entity
+		mode: directLake
+		source
+			entityName: gold_safe_fact_claim
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+

@@ -1,0 +1,21 @@
+model gold_safe_analytics_model
+	culture: en-US
+	defaultPowerBIDataSourceVersion: powerBI_V3
+	sourceQueryCulture: en-US
+	dataAccessOptions
+		legacyRedirects
+		returnErrorValuesAsNull
+
+annotation PBI_ProTooling = ["MCP-PBIModeling"]
+
+ref table gold_safe_dim_patient
+ref table gold_safe_dim_provider
+ref table gold_safe_dim_department
+ref table gold_safe_dim_facility
+ref table gold_safe_dim_payer
+ref table gold_safe_dim_diagnosis
+ref table gold_safe_dim_procedure
+ref table gold_safe_fact_encounter
+ref table gold_safe_fact_claim
+ref table gold_safe_fact_risk_score
+

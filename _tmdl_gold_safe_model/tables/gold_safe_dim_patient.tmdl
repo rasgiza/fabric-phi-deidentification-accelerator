@@ -1,0 +1,79 @@
+table gold_safe_dim_patient
+	lineageTag: 6afb9a93-fd73-4ec9-aa99-42600f544bcb
+
+	column PatientKey
+		dataType: int64
+		isHidden
+		isKey
+		lineageTag: 367edc1a-bc98-405b-9975-738b2a21fcba
+		summarizeBy: none
+		sourceColumn: PatientKey
+
+	column MRN
+		dataType: string
+		lineageTag: da73d989-5e06-4db6-a579-969aa615f78a
+		summarizeBy: none
+		sourceColumn: MRN
+
+	column PatientName
+		dataType: string
+		lineageTag: f6a7cdf8-561a-40d2-a991-e3b5e56bf066
+		summarizeBy: none
+		sourceColumn: PatientName
+
+	column BirthYear
+		dataType: int64
+		lineageTag: 76e61c67-1b99-41ce-89cc-6c4e2c93c9fd
+		summarizeBy: none
+		sourceColumn: BirthYear
+
+	column Age
+		dataType: int64
+		lineageTag: ac44534d-98d0-4f4f-9db4-be0105e83086
+		summarizeBy: none
+		sourceColumn: Age
+
+	column AgeBand
+		dataType: string
+		lineageTag: 71a4b9fc-1476-464b-a77e-21dba3732ba0
+		summarizeBy: none
+		sourceColumn: AgeBand
+
+	column Gender
+		dataType: string
+		lineageTag: c92c03fa-7f98-4bff-ace1-b145ccd275f9
+		summarizeBy: none
+		sourceColumn: Gender
+
+	column Race
+		dataType: string
+		lineageTag: f5d371b8-04c4-4ea1-9b11-13100f365df4
+		summarizeBy: none
+		sourceColumn: Race
+
+	column Ethnicity
+		dataType: string
+		lineageTag: 7a8af304-b0e3-44e5-b920-082934c9210a
+		summarizeBy: none
+		sourceColumn: Ethnicity
+
+	column ZIP
+		dataType: string
+		lineageTag: 81318d49-5c63-4aa8-8494-609e3ff6fc8a
+		summarizeBy: none
+		sourceColumn: ZIP
+
+	column PCPProviderKey
+		dataType: int64
+		isHidden
+		lineageTag: b581772a-f8ca-443d-b2a1-8fcafac4496b
+		summarizeBy: none
+		sourceColumn: PCPProviderKey
+
+	partition gold_safe_dim_patient = entity
+		mode: directLake
+		source
+			entityName: gold_safe_dim_patient
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+

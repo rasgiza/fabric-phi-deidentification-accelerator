@@ -1,0 +1,20 @@
+{
+  "name": "phi_toggle_nav",
+  "visual": {
+    "visualType": "bookmarkNavigator",
+    "query": {
+      "queryState": {}
+    },
+    "objects": {},
+    "drillFilterOtherVisuals": true
+  },
+  "position": {
+    "x": 812,
+    "y": 40,
+    "z": 0,
+    "width": 432,
+    "height": 56,
+    "tabOrder": 0
+  },
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definition/visualContainer/2.9.0/schema.json"
+}

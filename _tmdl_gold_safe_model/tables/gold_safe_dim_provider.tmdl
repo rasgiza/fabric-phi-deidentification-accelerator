@@ -1,0 +1,78 @@
+table gold_safe_dim_provider
+	lineageTag: 524e1a3f-3b51-4df0-8ec5-aae2fbe8e4a6
+
+	column ProviderKey
+		dataType: int64
+		isHidden
+		isKey
+		lineageTag: f34846bf-cc2f-4c73-87fc-be689c9b9363
+		summarizeBy: none
+		sourceColumn: ProviderKey
+
+	column NPI
+		dataType: string
+		lineageTag: b15d7c5e-4002-4a05-b09d-1c3de249761e
+		summarizeBy: none
+		sourceColumn: NPI
+
+	column ProviderFullName
+		dataType: string
+		lineageTag: b7e73dc7-3092-4056-ac3a-e76fd9087b63
+		summarizeBy: none
+		sourceColumn: ProviderFullName
+
+	column Credentials
+		dataType: string
+		lineageTag: cd406c0a-5588-40d7-9be5-39d7c47bc7f9
+		summarizeBy: none
+		sourceColumn: Credentials
+
+	column Gender
+		dataType: string
+		lineageTag: 2aca8737-45da-402b-915a-e6b79c2c030a
+		summarizeBy: none
+		sourceColumn: Gender
+
+	column ProviderType
+		dataType: string
+		lineageTag: 71c8875e-4c20-4883-95cd-48f8da1f66fa
+		summarizeBy: none
+		sourceColumn: ProviderType
+
+	column PrimarySpecialty
+		dataType: string
+		lineageTag: 38b542ae-7c48-4fa1-bfc0-6118c7ff63d9
+		summarizeBy: none
+		sourceColumn: PrimarySpecialty
+
+	column ProviderStatus
+		dataType: string
+		lineageTag: d322e6ba-1474-4672-892a-b59962264789
+		summarizeBy: none
+		sourceColumn: ProviderStatus
+
+	column IsActive
+		dataType: boolean
+		lineageTag: 047343d1-5df1-4d75-a9e9-e70291aa0897
+		summarizeBy: none
+		sourceColumn: IsActive
+
+	column HireDate
+		dataType: dateTime
+		lineageTag: c9ac9301-d37d-4831-b4e7-9449151f06bd
+		summarizeBy: none
+		sourceColumn: HireDate
+
+	column TerminationDate
+		dataType: dateTime
+		lineageTag: 85e70e0b-fdb4-4cc7-bf15-a8e827dc78e6
+		summarizeBy: none
+		sourceColumn: TerminationDate
+
+	partition gold_safe_dim_provider = entity
+		mode: directLake
+		source
+			entityName: gold_safe_dim_provider
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+

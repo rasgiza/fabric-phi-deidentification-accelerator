@@ -1,0 +1,56 @@
+table gold_safe_fact_risk_score
+	lineageTag: f922b9c4-065b-4731-9d32-4ab61c981b3c
+
+	measure 'Avg Risk Score' = AVERAGE ( gold_safe_fact_risk_score[RiskScore] )
+		formatString: 0.000
+		displayFolder: KPIs
+		lineageTag: 80ad6275-3d5d-49fd-992b-7e6dc57444fa
+
+	column RiskScoreKey
+		dataType: int64
+		isHidden
+		isKey
+		lineageTag: 69491835-c55c-4fe5-b680-29ebe6805ca5
+		summarizeBy: none
+		sourceColumn: RiskScoreKey
+
+	column PatientKey
+		dataType: int64
+		isHidden
+		lineageTag: be261638-9a43-452e-9405-d2c59b839702
+		summarizeBy: none
+		sourceColumn: PatientKey
+
+	column ProviderKey
+		dataType: int64
+		isHidden
+		lineageTag: d848b764-9f0f-4820-b5d4-535a4778056a
+		summarizeBy: none
+		sourceColumn: ProviderKey
+
+	column RiskModel
+		dataType: string
+		lineageTag: 198bbb85-15a1-48e6-8f96-b9b7845e33bd
+		summarizeBy: none
+		sourceColumn: RiskModel
+
+	column RiskScore
+		dataType: double
+		formatString: 0.000
+		lineageTag: 617f0fdf-995b-46f9-bf9c-62c7a6fe5dd6
+		summarizeBy: none
+		sourceColumn: RiskScore
+
+	column ScoreYear
+		dataType: int64
+		lineageTag: 8ccdd226-2175-463e-97ef-a533c24e9d94
+		summarizeBy: none
+		sourceColumn: ScoreYear
+
+	partition gold_safe_fact_risk_score = entity
+		mode: directLake
+		source
+			entityName: gold_safe_fact_risk_score
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+

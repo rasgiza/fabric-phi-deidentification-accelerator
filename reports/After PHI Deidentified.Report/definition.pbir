@@ -1,0 +1,9 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/fabric/item/report/definitionProperties/2.0.0/schema.json",
+  "version": "4.0",
+  "datasetReference": {
+    "byConnection": {
+      "connectionString": "Data Source=\"powerbi://api.powerbi.com/v1.0/myorg/PHI-Analytics\";initial catalog=\"gold_safe_analytics_model\";integrated security=ClaimsToken;semanticmodelid=c5d80a99-79d6-4f2f-9527-87d2c196ed80"
+    }
+  }
+}

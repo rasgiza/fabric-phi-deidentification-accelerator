@@ -1,0 +1,36 @@
+table gold_safe_dim_payer
+	lineageTag: da78f905-3789-495e-9394-17035b39fc6d
+
+	column PayerKey
+		dataType: int64
+		isHidden
+		isKey
+		lineageTag: 72b102f9-b6ec-40c3-8c17-09ad0f628485
+		summarizeBy: none
+		sourceColumn: PayerKey
+
+	column PayerName
+		dataType: string
+		lineageTag: 5451ad4b-d005-4a97-9e33-b323b4cd89e6
+		summarizeBy: none
+		sourceColumn: PayerName
+
+	column PlanType
+		dataType: string
+		lineageTag: 1706de77-4943-4f84-9986-70fa21056896
+		summarizeBy: none
+		sourceColumn: PlanType
+
+	column LineOfBusiness
+		dataType: string
+		lineageTag: a554e5a4-71ea-4793-b7a6-afc951ff9501
+		summarizeBy: none
+		sourceColumn: LineOfBusiness
+
+	partition gold_safe_dim_payer = entity
+		mode: directLake
+		source
+			entityName: gold_safe_dim_payer
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+

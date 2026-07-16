@@ -1,0 +1,94 @@
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fabric-phi-deid"
+description = "Config-driven PHI de-identification + tokenization reference pattern for Microsoft Fabric (synthetic-data-only)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+keywords = ["healthcare", "phi", "de-identification", "hipaa", "microsoft-fabric", "tokenization"]
+dynamic = ["version"]
+dependencies = [
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+# PySpark is provided by the Fabric runtime in production; install locally only to run the
+# Spark integration tests. Pinned to the Fabric Runtime 1.3 line (Spark 3.5 / Python 3.11).
+spark = ["pyspark~=3.5.0"]
+# Free-text NER backend for ner_text. Optional: the module falls back to a regex-only detector
+# when these are absent. Presidio pulls in spaCy; download a model (e.g. en_core_web_lg) too.
+nlp = [
+    "presidio-analyzer>=2.2",
+    "presidio-anonymizer>=2.2",
+]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "hypothesis>=6.100",
+    "ruff>=0.6",
+    "mypy>=1.11",
+    "types-PyYAML>=6.0",
+    "bandit>=1.7",
+    "pip-audit>=2.7",
+]
+
+[tool.hatch.version]
+path = "src/fabric_phi_deid/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fabric_phi_deid"]
+
+# --------------------------------------------------------------------------------------
+# Tooling
+# --------------------------------------------------------------------------------------
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+src = ["src", "tests"]
+# Fabric notebooks run under a runtime that injects globals (``spark``, ``notebookutils``)
+# and are exported as .ipynb; they are validated by execution in Fabric, not by the package
+# lint gate. Exclude them so CI reflects the installable package + tests only.
+extend-exclude = ["notebooks"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S"]
+# E501: line length is handled by the formatter; long docstrings/comments are fine.
+# S101: asserts are the intended assertion mechanism in tests + scorecard.
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["S101", "E402"]  # E402: intentional section-break import in test_deid_core
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src"]
+ignore_missing_imports = true          # pyspark / notebookutils are runtime-only
+check_untyped_defs = true
+warn_redundant_casts = true
+warn_unused_ignores = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+markers = [
+    "spark: end-to-end tests that require a local PySpark session (deselect with -m 'not spark')",
+]
+
+[tool.coverage.run]
+source = ["fabric_phi_deid"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+]
+
+[tool.bandit]
+exclude_dirs = ["tests", "notebooks"]

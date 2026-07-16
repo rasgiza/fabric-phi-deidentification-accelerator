@@ -1,0 +1,48 @@
+table gold_safe_dim_facility
+	lineageTag: 8f7951db-374b-465b-9cfa-8b1562f2a94b
+
+	column FacilityKey
+		dataType: int64
+		isHidden
+		isKey
+		lineageTag: ba616624-050f-47b7-a940-88d15cec1e17
+		summarizeBy: none
+		sourceColumn: FacilityKey
+
+	column FacilityName
+		dataType: string
+		lineageTag: 89d8ec69-0902-4d8b-9948-0dcb7e1eed4b
+		summarizeBy: none
+		sourceColumn: FacilityName
+
+	column City
+		dataType: string
+		lineageTag: ed2f0421-c960-4dc8-9dd6-840d9146d2cd
+		summarizeBy: none
+		sourceColumn: City
+
+	column StateAbbr
+		dataType: string
+		lineageTag: 722e05f5-2e7f-4847-b336-38e3ccf9b53f
+		summarizeBy: none
+		sourceColumn: StateAbbr
+
+	column ZIP
+		dataType: string
+		lineageTag: c40d7367-2397-469e-bc8a-5d4e4b0671e7
+		summarizeBy: none
+		sourceColumn: ZIP
+
+	column Region
+		dataType: string
+		lineageTag: 4881cd25-8acc-4761-98df-340cc5d806da
+		summarizeBy: none
+		sourceColumn: Region
+
+	partition gold_safe_dim_facility = entity
+		mode: directLake
+		source
+			entityName: gold_safe_dim_facility
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+

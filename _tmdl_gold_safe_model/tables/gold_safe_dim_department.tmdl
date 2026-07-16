@@ -1,0 +1,36 @@
+table gold_safe_dim_department
+	lineageTag: 131ec5db-5c29-41d2-b377-01d172cb63af
+
+	column DepartmentKey
+		dataType: int64
+		isHidden
+		isKey
+		lineageTag: 7513c9be-9a28-42c5-9ffc-58105d6249f3
+		summarizeBy: none
+		sourceColumn: DepartmentKey
+
+	column DepartmentName
+		dataType: string
+		lineageTag: e018088d-d686-493b-842e-02869390042f
+		summarizeBy: none
+		sourceColumn: DepartmentName
+
+	column ServiceLine
+		dataType: string
+		lineageTag: 9c06bce5-7feb-451b-bb99-e6ac3e182411
+		summarizeBy: none
+		sourceColumn: ServiceLine
+
+	column DepartmentSpecialty
+		dataType: string
+		lineageTag: 53b93e0d-758b-4a3c-8920-ccfe6f958b00
+		summarizeBy: none
+		sourceColumn: DepartmentSpecialty
+
+	partition gold_safe_dim_department = entity
+		mode: directLake
+		source
+			entityName: gold_safe_dim_department
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+

@@ -1,0 +1,58 @@
+relationship senc_patient
+	fromColumn: gold_safe_fact_encounter.PatientKey
+	toColumn: gold_safe_dim_patient.PatientKey
+
+relationship senc_attending_provider
+	fromColumn: gold_safe_fact_encounter.AttendingProviderKey
+	toColumn: gold_safe_dim_provider.ProviderKey
+
+relationship senc_referring_provider
+	isActive: false
+	fromColumn: gold_safe_fact_encounter.ReferringProviderKey
+	toColumn: gold_safe_dim_provider.ProviderKey
+
+relationship senc_department
+	fromColumn: gold_safe_fact_encounter.DepartmentKey
+	toColumn: gold_safe_dim_department.DepartmentKey
+
+relationship senc_facility
+	fromColumn: gold_safe_fact_encounter.LocationKey
+	toColumn: gold_safe_dim_facility.FacilityKey
+
+relationship senc_diagnosis
+	fromColumn: gold_safe_fact_encounter.DiagnosisKey
+	toColumn: gold_safe_dim_diagnosis.DiagnosisKey
+
+relationship sclm_patient
+	fromColumn: gold_safe_fact_claim.PatientKey
+	toColumn: gold_safe_dim_patient.PatientKey
+
+relationship sclm_billing_provider
+	fromColumn: gold_safe_fact_claim.BillingProviderKey
+	toColumn: gold_safe_dim_provider.ProviderKey
+
+relationship sclm_rendering_provider
+	isActive: false
+	fromColumn: gold_safe_fact_claim.RenderingProviderKey
+	toColumn: gold_safe_dim_provider.ProviderKey
+
+relationship sclm_payer
+	fromColumn: gold_safe_fact_claim.PayerKey
+	toColumn: gold_safe_dim_payer.PayerKey
+
+relationship sclm_procedure
+	fromColumn: gold_safe_fact_claim.ProcedureKey
+	toColumn: gold_safe_dim_procedure.ProcedureKey
+
+relationship sclm_diagnosis
+	fromColumn: gold_safe_fact_claim.DiagnosisKey
+	toColumn: gold_safe_dim_diagnosis.DiagnosisKey
+
+relationship srisk_patient
+	fromColumn: gold_safe_fact_risk_score.PatientKey
+	toColumn: gold_safe_dim_patient.PatientKey
+
+relationship srisk_provider
+	fromColumn: gold_safe_fact_risk_score.ProviderKey
+	toColumn: gold_safe_dim_provider.ProviderKey
+

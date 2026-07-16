@@ -1,0 +1,12 @@
+# Core (pure Python — testable locally without Spark)
+#
+# NOTE: dependency metadata now lives in pyproject.toml. This file is kept only as a
+# convenience for Fabric notebook environments. For local development use:
+#     python -m pip install -e ".[dev]"
+PyYAML>=6.0
+
+# Notebooks run inside Microsoft Fabric, which provides pyspark and notebookutils.
+# Do NOT pin pyspark here; use the Fabric runtime's version.
+
+# Dev / test (superset lives in pyproject.toml [project.optional-dependencies].dev)
+pytest>=8.0

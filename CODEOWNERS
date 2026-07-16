@@ -1,0 +1,24 @@
+# Code owners for the Fabric PHI De-identification Accelerator.
+#
+# These owners are automatically requested for review on matching paths. Changes to the
+# de-identification logic, rulebook, or security posture MUST be reviewed by an owner.
+#
+# Replace the placeholder handles/teams with your real GitHub org teams before use.
+
+# Default owner for everything.
+*                       @your-org/hls-data-platform
+
+# The de-identification engine + tokenization + config integrity: highest scrutiny.
+/src/fabric_phi_deid/   @your-org/hls-security @your-org/hls-data-platform
+
+# The rulebook: any classification change is a compliance decision.
+/config/                @your-org/hls-security
+
+# Security-relevant policy + docs.
+/SECURITY.md            @your-org/hls-security
+/docs/hipaa_compliance.md         @your-org/hls-security
+/docs/pre_real_phi_checklist.md   @your-org/hls-security
+/docs/pepper_rotation_runbook.md  @your-org/hls-security
+
+# CI / supply-chain configuration.
+/.github/               @your-org/hls-data-platform

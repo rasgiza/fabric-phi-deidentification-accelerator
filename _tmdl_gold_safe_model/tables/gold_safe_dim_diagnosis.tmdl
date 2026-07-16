@@ -1,0 +1,36 @@
+table gold_safe_dim_diagnosis
+	lineageTag: 3a962880-46d3-4a0a-b549-75fe1d495455
+
+	column DiagnosisKey
+		dataType: int64
+		isHidden
+		isKey
+		lineageTag: 8b9c3dd0-4e2b-4f1d-98ad-9d6232f4a67a
+		summarizeBy: none
+		sourceColumn: DiagnosisKey
+
+	column ICD10Code
+		dataType: string
+		lineageTag: 41a5ac66-021f-4f93-837b-9cdb63d17fc3
+		summarizeBy: none
+		sourceColumn: ICD10Code
+
+	column DiagnosisName
+		dataType: string
+		lineageTag: a52a64da-d20d-4c7f-9448-8fc617d3d2f4
+		summarizeBy: none
+		sourceColumn: DiagnosisName
+
+	column DiagnosisCategory
+		dataType: string
+		lineageTag: f804a1cd-0f0c-4a78-b4f7-2af95905bf18
+		summarizeBy: none
+		sourceColumn: DiagnosisCategory
+
+	partition gold_safe_dim_diagnosis = entity
+		mode: directLake
+		source
+			entityName: gold_safe_dim_diagnosis
+			schemaName: dbo
+			expressionSource: DatabaseQuery
+

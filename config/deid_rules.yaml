@@ -1,0 +1,263 @@
+# =====================================================================================
+# deid_rules.yaml — the rulebook that drives the de-identification engine.
+#
+# SYNTHETIC DATA ONLY. Tuned for the synthetic Epic-Caboodle provider dataset (13 tables).
+# Validate against your own data + a qualified reviewer before any use on real PHI.
+#
+# How it works
+# ------------
+# A *profile* selects the overall de-id posture. Each profile has:
+#   - default_strategy : applied to ANY column not explicitly listed (deny-by-default).
+#   - tables           : per-table, per-column strategy + params.
+#
+# A column rule is either:
+#   column: strategy_name                          # shorthand, no params
+#   column: {strategy: name, param: value, ...}    # full form with params
+#
+# DENY-BY-DEFAULT: default_strategy is `suppress`, so an unclassified column is DROPPED,
+# not leaked. Every kept column below is therefore a deliberate, auditable decision.
+# Pipeline/lineage columns (prefixed `_`) are passed through untouched by the engine.
+#
+# The classification you assign in Tier 0 (catalog sensitivity labels) is the SOURCE of
+# these rules — this is where "this column is PHI" becomes "so de-identify it".
+# =====================================================================================
+
+active_profile: safe_harbor
+
+profiles:
+
+  # -----------------------------------------------------------------------------------
+  # SAFE HARBOR (§164.514(b)(2)): strip / generalize the 18 identifiers.
+  # Dates -> year, ZIP -> 3 digits (000 for low-pop), ages 90+ capped, direct identifiers
+  # tokenized or suppressed. Output is de-identified and falls OUTSIDE HIPAA.
+  # -----------------------------------------------------------------------------------
+  safe_harbor:
+    default_strategy: suppress
+
+    tables:
+
+      # ---- DimPatient: primary PHI table ------------------------------------------
+      dim_patient:
+        PatientKey:        passthrough                # surrogate key, not PHI
+        PatientDurableKey: passthrough
+        MRN:               {strategy: tokenize, namespace: mrn, prefix: "PT-"}
+        FirstName:         {strategy: synthesize, kind: first_name}
+        LastName:          {strategy: synthesize, kind: last_name}
+        PatientName:       {strategy: synthesize, kind: name}
+        DateOfBirth:       {strategy: generalize, kind: year}   # -> birth year (int)
+        Age:               {strategy: generalize, kind: age_cap, cap: 90}
+        AgeBand:           passthrough                # already generalized in silver
+        Gender:            passthrough
+        Race:              passthrough
+        Ethnicity:         passthrough
+        ZIP:               {strategy: generalize, kind: zip3}
+        PCPProviderKey:    passthrough                # surrogate FK
+        EffectiveDate:     passthrough                # SCD record-mgmt date, not a care event
+        ExpirationDate:    passthrough
+
+      # ---- DimProvider: NPI + names identify the provider (optional; disable if not needed)
+      dim_provider:
+        ProviderKey:        passthrough
+        ProviderDurableKey: passthrough
+        NPI:                {strategy: tokenize, namespace: npi, prefix: "NP-"}
+        ProviderName:       {strategy: synthesize, kind: name}
+        FirstName:          {strategy: synthesize, kind: first_name}
+        LastName:           {strategy: synthesize, kind: last_name}
+        ProviderFullName:   {strategy: synthesize, kind: name}   # derived in silver
+        Credentials:        passthrough
+        Gender:             passthrough
+        ProviderType:       passthrough
+        IsProviderActive:   passthrough
+        PrimarySpecialty:   passthrough
+        ProviderStatus:     passthrough
+        HireDate:           passthrough                # provider employment, not patient PHI
+        TerminationDate:    passthrough
+        IsActive:           passthrough                # derived in silver
+        EffectiveDate:      passthrough
+        ExpirationDate:     passthrough
+
+      # ---- DimProviderCredential: license/DEA numbers are direct identifiers -------
+      dim_provider_credential:
+        ProviderCredentialKey:   passthrough
+        ProviderKey:             passthrough
+        ProviderDurableKey:      passthrough
+        LicenseNumber:           {strategy: tokenize, namespace: license, prefix: "LIC-"}
+        LicenseState:            passthrough
+        DEANumber:               {strategy: tokenize, namespace: dea, prefix: "DEA-"}
+        BoardCertification:      passthrough
+        LicenseExpirationDate:   passthrough
+        DEAExpirationDate:       passthrough
+        BoardCertExpirationDate: passthrough
+        EffectiveDate:           passthrough
+        ExpirationDate:          passthrough
+
+      # ---- DimFacility: street address is an identifier; facility (org) ZIP is fine --
+      dim_facility:
+        FacilityKey:        passthrough
+        FacilityDurableKey: passthrough
+        FacilityID:         passthrough
+        FacilityName:       passthrough
+        AddressLine1:       suppress                   # street address = identifier
+        City:               passthrough
+        StateAbbr:          passthrough
+        ZIP:                passthrough                # facility (org) geography, not patient
+        Region:             passthrough
+        EffectiveDate:      passthrough
+        ExpirationDate:     passthrough
+
+      # ---- Facts: keep keys/measures; generalize care dates to year; drop month ------
+      fact_claim:
+        ClaimKey:               passthrough
+        PatientKey:             passthrough
+        BillingProviderKey:     passthrough
+        RenderingProviderKey:   passthrough
+        PayerKey:               passthrough
+        ProcedureKey:           passthrough
+        DiagnosisKey:           passthrough
+        ServiceDate:            {strategy: generalize, kind: year}
+        BilledAmount:           passthrough
+        AllowedAmount:          passthrough
+        PaidAmount:             passthrough
+        ClaimStatus:            passthrough
+        DeniedFlag:             passthrough
+        AllowedVariance:        passthrough
+        PatientResponsibility:  passthrough
+        ServiceYear:            passthrough            # already year-grain
+        ServiceMonth:           suppress               # yyyy-MM too granular for Safe Harbor
+
+      fact_encounter:
+        EncounterKey:          passthrough
+        PatientKey:            passthrough
+        AttendingProviderKey:  passthrough
+        ReferringProviderKey:  passthrough
+        DepartmentKey:         passthrough
+        LocationKey:           passthrough
+        DiagnosisKey:          passthrough
+        EncounterDate:         {strategy: generalize, kind: year}
+        EncounterType:         passthrough
+        LengthOfStay:          passthrough
+        EncounterYear:         passthrough
+        EncounterMonth:        suppress
+
+      fact_risk_score:
+        RiskScoreKey: passthrough
+        PatientKey:   passthrough
+        ProviderKey:  passthrough
+        RiskModel:    passthrough
+        RiskScore:    passthrough
+        ScoreDate:    {strategy: generalize, kind: year}
+
+  # -----------------------------------------------------------------------------------
+  # EXPERT DETERMINATION (§164.514(b)(1)): retain analytic utility. Care dates are
+  # SHIFTED per-patient (intervals preserved) instead of collapsed to year. Requires a
+  # statistician's determination of low re-identification risk.
+  # -----------------------------------------------------------------------------------
+  expert_determination:
+    default_strategy: suppress
+
+    tables:
+      dim_patient:
+        PatientKey:        passthrough
+        PatientDurableKey: passthrough
+        MRN:               {strategy: tokenize, namespace: mrn, prefix: "PT-"}
+        FirstName:         {strategy: synthesize, kind: first_name}
+        LastName:          {strategy: synthesize, kind: last_name}
+        PatientName:       {strategy: synthesize, kind: name}
+        DateOfBirth:       {strategy: date_shift, entity_column: PatientKey, max_days: 365}
+        Age:               {strategy: generalize, kind: age_cap, cap: 90}
+        AgeBand:           passthrough
+        Gender:            passthrough
+        Race:              passthrough
+        Ethnicity:         passthrough
+        ZIP:               {strategy: generalize, kind: zip3}
+        PCPProviderKey:    passthrough
+        EffectiveDate:     passthrough
+        ExpirationDate:    passthrough
+
+      dim_provider:
+        ProviderKey:        passthrough
+        ProviderDurableKey: passthrough
+        NPI:                {strategy: tokenize, namespace: npi, prefix: "NP-"}
+        ProviderName:       {strategy: synthesize, kind: name}
+        FirstName:          {strategy: synthesize, kind: first_name}
+        LastName:           {strategy: synthesize, kind: last_name}
+        ProviderFullName:   {strategy: synthesize, kind: name}
+        Credentials:        passthrough
+        Gender:             passthrough
+        ProviderType:       passthrough
+        IsProviderActive:   passthrough
+        PrimarySpecialty:   passthrough
+        ProviderStatus:     passthrough
+        HireDate:           passthrough
+        TerminationDate:    passthrough
+        IsActive:           passthrough
+        EffectiveDate:      passthrough
+        ExpirationDate:     passthrough
+
+      dim_provider_credential:
+        ProviderCredentialKey:   passthrough
+        ProviderKey:             passthrough
+        ProviderDurableKey:      passthrough
+        LicenseNumber:           {strategy: tokenize, namespace: license, prefix: "LIC-"}
+        LicenseState:            passthrough
+        DEANumber:               {strategy: tokenize, namespace: dea, prefix: "DEA-"}
+        BoardCertification:      passthrough
+        LicenseExpirationDate:   passthrough
+        DEAExpirationDate:       passthrough
+        BoardCertExpirationDate: passthrough
+        EffectiveDate:           passthrough
+        ExpirationDate:          passthrough
+
+      dim_facility:
+        FacilityKey:        passthrough
+        FacilityDurableKey: passthrough
+        FacilityID:         passthrough
+        FacilityName:       passthrough
+        AddressLine1:       suppress
+        City:               passthrough
+        StateAbbr:          passthrough
+        ZIP:                passthrough
+        Region:             passthrough
+        EffectiveDate:      passthrough
+        ExpirationDate:     passthrough
+
+      fact_claim:
+        ClaimKey:               passthrough
+        PatientKey:             passthrough
+        BillingProviderKey:     passthrough
+        RenderingProviderKey:   passthrough
+        PayerKey:               passthrough
+        ProcedureKey:           passthrough
+        DiagnosisKey:           passthrough
+        ServiceDate:            {strategy: date_shift, entity_column: PatientKey, max_days: 365}
+        BilledAmount:           passthrough
+        AllowedAmount:          passthrough
+        PaidAmount:             passthrough
+        ClaimStatus:            passthrough
+        DeniedFlag:             passthrough
+        AllowedVariance:        passthrough
+        PatientResponsibility:  passthrough
+        ServiceYear:            passthrough
+        ServiceMonth:           suppress
+
+      fact_encounter:
+        EncounterKey:          passthrough
+        PatientKey:            passthrough
+        AttendingProviderKey:  passthrough
+        ReferringProviderKey:  passthrough
+        DepartmentKey:         passthrough
+        LocationKey:           passthrough
+        DiagnosisKey:          passthrough
+        EncounterDate:         {strategy: date_shift, entity_column: PatientKey, max_days: 365}
+        EncounterType:         passthrough
+        LengthOfStay:          passthrough
+        EncounterYear:         passthrough
+        EncounterMonth:        suppress
+
+      fact_risk_score:
+        RiskScoreKey: passthrough
+        PatientKey:   passthrough
+        ProviderKey:  passthrough
+        RiskModel:    passthrough
+        RiskScore:    passthrough
+        ScoreDate:    {strategy: date_shift, entity_column: PatientKey, max_days: 365}
