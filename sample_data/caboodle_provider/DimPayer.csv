@@ -1,0 +1,26 @@
+PayerKey,PayerDurableKey,PayerID,PayerName,PlanType,LineOfBusiness,_IsCurrent,EffectiveDate,ExpirationDate
+1,3001,PAY0001,Aetna Choice PPO,Commercial,PPO,1,2015-01-01,9999-12-31
+2,3002,PAY0002,Blue Cross Blue Shield PPO,Commercial,PPO,1,2015-01-01,9999-12-31
+3,3003,PAY0003,Cigna Open Access,Commercial,PPO,1,2015-01-01,9999-12-31
+4,3004,PAY0004,UnitedHealthcare Choice,Commercial,HMO,1,2015-01-01,9999-12-31
+5,3005,PAY0005,Humana Commercial,Commercial,HMO,1,2015-01-01,9999-12-31
+6,3006,PAY0006,Kaiser Permanente,Commercial,HMO,1,2015-01-01,9999-12-31
+7,3007,PAY0007,Anthem Blue Cross,Commercial,PPO,1,2015-01-01,9999-12-31
+8,3008,PAY0008,Oscar Health,Commercial,EPO,1,2015-01-01,9999-12-31
+9,3009,PAY0009,Harvard Pilgrim,Commercial,PPO,1,2015-01-01,9999-12-31
+10,3010,PAY0010,Tufts Health Plan,Commercial,HMO,1,2015-01-01,9999-12-31
+11,3011,PAY0011,Medicare Part A,Medicare,Original Medicare,1,2015-01-01,9999-12-31
+12,3012,PAY0012,Medicare Part B,Medicare,Original Medicare,1,2015-01-01,9999-12-31
+13,3013,PAY0013,Humana Medicare Advantage,Medicare,Medicare Advantage,1,2015-01-01,9999-12-31
+14,3014,PAY0014,UHC Medicare Advantage,Medicare,Medicare Advantage,1,2015-01-01,9999-12-31
+15,3015,PAY0015,Aetna Medicare Advantage,Medicare,Medicare Advantage,1,2015-01-01,9999-12-31
+16,3016,PAY0016,Wellcare Medicare,Medicare,Medicare Advantage,1,2015-01-01,9999-12-31
+17,3017,PAY0017,Medicaid Fee-for-Service,Medicaid,Medicaid FFS,1,2015-01-01,9999-12-31
+18,3018,PAY0018,Medicaid Managed Care,Medicaid,Medicaid MCO,1,2015-01-01,9999-12-31
+19,3019,PAY0019,MassHealth,Medicaid,Medicaid MCO,1,2015-01-01,9999-12-31
+20,3020,PAY0020,Molina Healthcare Medicaid,Medicaid,Medicaid MCO,1,2015-01-01,9999-12-31
+21,3021,PAY0021,Centene Medicaid,Medicaid,Medicaid MCO,1,2015-01-01,9999-12-31
+22,3022,PAY0022,Amerigroup Medicaid,Medicaid,Medicaid MCO,1,2015-01-01,9999-12-31
+23,3023,PAY0023,Tricare,Commercial,Government,1,2015-01-01,9999-12-31
+24,3024,PAY0024,Self-Pay,Commercial,Self-Pay,1,2015-01-01,9999-12-31
+25,3025,PAY0025,Workers Compensation,Commercial,Workers Comp,1,2015-01-01,9999-12-31

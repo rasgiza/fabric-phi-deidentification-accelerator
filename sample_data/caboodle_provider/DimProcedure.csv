@@ -1,0 +1,46 @@
+ProcedureKey,ProcedureDurableKey,ProcedureCode,CodeType,ProcedureDescription,_IsCurrent,EffectiveDate,ExpirationDate
+1,5001,99202,CPT,"Office/outpatient visit, new patient, straightforward",1,2015-01-01,9999-12-31
+2,5002,99203,CPT,"Office/outpatient visit, new patient, low complexity",1,2015-01-01,9999-12-31
+3,5003,99204,CPT,"Office/outpatient visit, new patient, moderate complexity",1,2015-01-01,9999-12-31
+4,5004,99213,CPT,"Office/outpatient visit, established patient, low complexity",1,2015-01-01,9999-12-31
+5,5005,99214,CPT,"Office/outpatient visit, established patient, moderate complexity",1,2015-01-01,9999-12-31
+6,5006,99215,CPT,"Office/outpatient visit, established patient, high complexity",1,2015-01-01,9999-12-31
+7,5007,99221,CPT,"Initial hospital care, low complexity",1,2015-01-01,9999-12-31
+8,5008,99223,CPT,"Initial hospital care, high complexity",1,2015-01-01,9999-12-31
+9,5009,99231,CPT,"Subsequent hospital care, low complexity",1,2015-01-01,9999-12-31
+10,5010,99285,CPT,"Emergency department visit, high complexity",1,2015-01-01,9999-12-31
+11,5011,99284,CPT,"Emergency department visit, moderate complexity",1,2015-01-01,9999-12-31
+12,5012,99283,CPT,"Emergency department visit, low-moderate complexity",1,2015-01-01,9999-12-31
+13,5013,93000,CPT,"Electrocardiogram, complete",1,2015-01-01,9999-12-31
+14,5014,93306,CPT,"Echocardiography, transthoracic, complete",1,2015-01-01,9999-12-31
+15,5015,93454,CPT,Coronary angiography,1,2015-01-01,9999-12-31
+16,5016,80053,CPT,Comprehensive metabolic panel,1,2015-01-01,9999-12-31
+17,5017,80061,CPT,Lipid panel,1,2015-01-01,9999-12-31
+18,5018,85025,CPT,Complete blood count with differential,1,2015-01-01,9999-12-31
+19,5019,83036,CPT,Hemoglobin A1c,1,2015-01-01,9999-12-31
+20,5020,84443,CPT,Thyroid stimulating hormone (TSH),1,2015-01-01,9999-12-31
+21,5021,36415,CPT,Collection of venous blood by venipuncture,1,2015-01-01,9999-12-31
+22,5022,71046,CPT,"Radiologic exam, chest, 2 views",1,2015-01-01,9999-12-31
+23,5023,70450,CPT,CT head/brain without contrast,1,2015-01-01,9999-12-31
+24,5024,72148,CPT,MRI lumbar spine without contrast,1,2015-01-01,9999-12-31
+25,5025,74177,CPT,CT abdomen and pelvis with contrast,1,2015-01-01,9999-12-31
+26,5026,45378,CPT,"Colonoscopy, diagnostic",1,2015-01-01,9999-12-31
+27,5027,45380,CPT,Colonoscopy with biopsy,1,2015-01-01,9999-12-31
+28,5028,43239,CPT,Upper GI endoscopy with biopsy,1,2015-01-01,9999-12-31
+29,5029,29881,CPT,"Arthroscopy, knee, with meniscectomy",1,2015-01-01,9999-12-31
+30,5030,27447,CPT,Total knee arthroplasty,1,2015-01-01,9999-12-31
+31,5031,27130,CPT,Total hip arthroplasty,1,2015-01-01,9999-12-31
+32,5032,47562,CPT,Laparoscopic cholecystectomy,1,2015-01-01,9999-12-31
+33,5033,59400,CPT,"Routine obstetric care including antepartum, vaginal delivery",1,2015-01-01,9999-12-31
+34,5034,59510,CPT,"Routine obstetric care including antepartum, cesarean delivery",1,2015-01-01,9999-12-31
+35,5035,90837,CPT,"Psychotherapy, 60 minutes",1,2015-01-01,9999-12-31
+36,5036,90834,CPT,"Psychotherapy, 45 minutes",1,2015-01-01,9999-12-31
+37,5037,96372,CPT,"Therapeutic injection, subcutaneous or intramuscular",1,2015-01-01,9999-12-31
+38,5038,11042,CPT,"Debridement, subcutaneous tissue",1,2015-01-01,9999-12-31
+39,5039,12001,CPT,Simple repair of superficial wounds,1,2015-01-01,9999-12-31
+40,5040,17000,CPT,"Destruction of premalignant lesion, first",1,2015-01-01,9999-12-31
+41,5041,G0439,HCPCS,"Annual wellness visit, subsequent",1,2015-01-01,9999-12-31
+42,5042,G0008,HCPCS,Administration of influenza virus vaccine,1,2015-01-01,9999-12-31
+43,5043,J1885,HCPCS,"Injection, ketorolac tromethamine, per 15 mg",1,2015-01-01,9999-12-31
+44,5044,J3301,HCPCS,"Injection, triamcinolone acetonide, per 10 mg",1,2015-01-01,9999-12-31
+45,5045,J9035,HCPCS,"Injection, bevacizumab, 10 mg",1,2015-01-01,9999-12-31

@@ -1,0 +1,41 @@
+FacilityKey,FacilityDurableKey,FacilityID,FacilityName,AddressLine1,City,StateAbbr,ZIP,Region,_IsCurrent,EffectiveDate,ExpirationDate
+1,2001,FAC0001,Boston Medical Center,793 Depot Street,Boston,MA,02115,Northeast,1,2015-01-01,9999-12-31
+2,2002,FAC0002,New York General Hospital,8645 Harrison Street,New York,NY,10016,Northeast,1,2015-01-01,9999-12-31
+3,2003,FAC0003,Philadelphia Regional Hospital,7817 Ashland Avenue,Philadelphia,PA,19104,Northeast,1,2015-01-01,9999-12-31
+4,2004,FAC0004,Chicago Health Clinic,713 El Camino Real,Chicago,IL,60611,Midwest,1,2015-01-01,9999-12-31
+5,2005,FAC0005,Cleveland Ambulatory Surgery Center,5611 Mary Street,Cleveland,OH,44195,Midwest,1,2015-01-01,9999-12-31
+6,2006,FAC0006,Minneapolis Specialty Hospital,5717 Court Street,Minneapolis,MN,55455,Midwest,1,2015-01-01,9999-12-31
+7,2007,FAC0007,Atlanta Medical Center,2870 Orchard Street,Atlanta,GA,30322,Southeast,1,2015-01-01,9999-12-31
+8,2008,FAC0008,Miami General Hospital,5610 McKinley Avenue,Miami,FL,33136,Southeast,1,2015-01-01,9999-12-31
+9,2009,FAC0009,Charlotte Regional Hospital,932 School Street,Charlotte,NC,28204,Southeast,1,2015-01-01,9999-12-31
+10,2010,FAC0010,Dallas Health Clinic,6547 Magnolia Avenue,Dallas,TX,75390,Southwest,1,2015-01-01,9999-12-31
+11,2011,FAC0011,Houston Ambulatory Surgery Center,8523 Highland Avenue,Houston,TX,77030,Southwest,1,2015-01-01,9999-12-31
+12,2012,FAC0012,Phoenix Specialty Hospital,1194 Massachusetts Avenue,Phoenix,AZ,85054,Southwest,1,2015-01-01,9999-12-31
+13,2013,FAC0013,Denver Medical Center,6988 Lafayette Street,Denver,CO,80045,West,1,2015-01-01,9999-12-31
+14,2014,FAC0014,Seattle General Hospital,8613 Ohio Street,Seattle,WA,98195,West,1,2015-01-01,9999-12-31
+15,2015,FAC0015,San Francisco Regional Hospital,6914 Forest Avenue,San Francisco,CA,94143,West,1,2015-01-01,9999-12-31
+16,2016,FAC0016,Los Angeles Health Clinic,8089 Victory Boulevard,Los Angeles,CA,90048,West,1,2015-01-01,9999-12-31
+17,2017,FAC0017,Boston Ambulatory Surgery Center,8513 Peachtree Street,Boston,MA,02115,Northeast,1,2015-01-01,9999-12-31
+18,2018,FAC0018,New York Specialty Hospital,7014 Central Street,New York,NY,10016,Northeast,1,2015-01-01,9999-12-31
+19,2019,FAC0019,Philadelphia Medical Center,1244 High Street,Philadelphia,PA,19104,Northeast,1,2015-01-01,9999-12-31
+20,2020,FAC0020,Chicago General Hospital,8718 Prairie Avenue,Chicago,IL,60611,Midwest,1,2015-01-01,9999-12-31
+21,2021,FAC0021,Cleveland Regional Hospital,7752 Market Street,Cleveland,OH,44195,Midwest,1,2015-01-01,9999-12-31
+22,2022,FAC0022,Minneapolis Health Clinic,5605 Vista Drive,Minneapolis,MN,55455,Midwest,1,2015-01-01,9999-12-31
+23,2023,FAC0023,Atlanta Ambulatory Surgery Center,7056 Pleasant Street,Atlanta,GA,30322,Southeast,1,2015-01-01,9999-12-31
+24,2024,FAC0024,Miami Specialty Hospital,8010 Second Street,Miami,FL,33136,Southeast,1,2015-01-01,9999-12-31
+25,2025,FAC0025,Charlotte Medical Center,1429 Sunrise Avenue,Charlotte,NC,28204,Southeast,1,2015-01-01,9999-12-31
+26,2026,FAC0026,Dallas General Hospital,598 Railroad Avenue,Dallas,TX,75390,Southwest,1,2015-01-01,9999-12-31
+27,2027,FAC0027,Houston Regional Hospital,8076 Industrial Boulevard,Houston,TX,77030,Southwest,1,2015-01-01,9999-12-31
+28,2028,FAC0028,Phoenix Health Clinic,8219 Country Club Drive,Phoenix,AZ,85054,Southwest,1,2015-01-01,9999-12-31
+29,2029,FAC0029,Denver Ambulatory Surgery Center,1905 Cross Street,Denver,CO,80045,West,1,2015-01-01,9999-12-31
+30,2030,FAC0030,Seattle Specialty Hospital,8934 Third Street,Seattle,WA,98195,West,1,2015-01-01,9999-12-31
+31,2031,FAC0031,San Francisco Medical Center,2585 Georgia Street,San Francisco,CA,94143,West,1,2015-01-01,9999-12-31
+32,2032,FAC0032,Los Angeles General Hospital,9086 Woodland Drive,Los Angeles,CA,90048,West,1,2015-01-01,9999-12-31
+33,2033,FAC0033,Boston Regional Hospital,8925 Terrace Avenue,Boston,MA,02115,Northeast,1,2015-01-01,9999-12-31
+34,2034,FAC0034,New York Health Clinic,5041 North Street,New York,NY,10016,Northeast,1,2015-01-01,9999-12-31
+35,2035,FAC0035,Philadelphia Ambulatory Surgery Center,4490 Canyon Road,Philadelphia,PA,19104,Northeast,1,2015-01-01,9999-12-31
+36,2036,FAC0036,Chicago Specialty Hospital,1011 Hoover Street,Chicago,IL,60611,Midwest,1,2015-01-01,9999-12-31
+37,2037,FAC0037,Cleveland Medical Center,4596 Cherry Street,Cleveland,OH,44195,Midwest,1,2015-01-01,9999-12-31
+38,2038,FAC0038,Minneapolis General Hospital,6840 Pennsylvania Avenue,Minneapolis,MN,55455,Midwest,1,2015-01-01,9999-12-31
+39,2039,FAC0039,Atlanta Regional Hospital,8050 Fifth Street,Atlanta,GA,30322,Southeast,1,2015-01-01,9999-12-31
+40,2040,FAC0040,Miami Health Clinic,697 Desert Road,Miami,FL,33136,Southeast,1,2015-01-01,9999-12-31

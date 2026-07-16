@@ -7,6 +7,12 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- Bundled synthetic sample dataset under `sample_data/caboodle_provider/` — the 13 Caboodle
+  provider CSVs (generated with Tonic Fabricate, no real PHI) so the Bronze→Silver→Gold
+  pipeline runs immediately after clone.
+- `scripts/generate_sample_data.py`: standard-library generator that appends more **synthetic**
+  patients and fact rows (claims, encounters, risk scores) to the bundled dataset while
+  preserving referential integrity to existing dimension/provider keys.
 - `determination.py`: **Expert Determination evidence pack** — bundles config fingerprint,
   k-anonymity / l-diversity / t-closeness measurements, and the residual direct-identifier
   scan into one PHI-free artifact with a single `passes` gate and a time-limited review-by

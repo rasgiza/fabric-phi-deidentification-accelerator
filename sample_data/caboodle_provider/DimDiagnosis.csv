@@ -1,0 +1,51 @@
+DiagnosisKey,DiagnosisDurableKey,ICD10Code,DiagnosisName,DiagnosisCategory,_IsCurrent,EffectiveDate,ExpirationDate
+1,4001,E11.9,Type 2 diabetes mellitus without complications,Endocrine,1,2015-01-01,9999-12-31
+2,4002,E11.65,Type 2 diabetes mellitus with hyperglycemia,Endocrine,1,2015-01-01,9999-12-31
+3,4003,E78.5,"Hyperlipidemia, unspecified",Endocrine,1,2015-01-01,9999-12-31
+4,4004,E03.9,"Hypothyroidism, unspecified",Endocrine,1,2015-01-01,9999-12-31
+5,4005,E66.9,"Obesity, unspecified",Endocrine,1,2015-01-01,9999-12-31
+6,4006,I10,Essential (primary) hypertension,Circulatory,1,2015-01-01,9999-12-31
+7,4007,I25.10,Atherosclerotic heart disease of native coronary artery,Circulatory,1,2015-01-01,9999-12-31
+8,4008,I48.91,Unspecified atrial fibrillation,Circulatory,1,2015-01-01,9999-12-31
+9,4009,I50.9,"Heart failure, unspecified",Circulatory,1,2015-01-01,9999-12-31
+10,4010,I21.4,Non-ST elevation myocardial infarction,Circulatory,1,2015-01-01,9999-12-31
+11,4011,J45.909,"Unspecified asthma, uncomplicated",Respiratory,1,2015-01-01,9999-12-31
+12,4012,J44.9,"Chronic obstructive pulmonary disease, unspecified",Respiratory,1,2015-01-01,9999-12-31
+13,4013,J18.9,"Pneumonia, unspecified organism",Respiratory,1,2015-01-01,9999-12-31
+14,4014,J06.9,"Acute upper respiratory infection, unspecified",Respiratory,1,2015-01-01,9999-12-31
+15,4015,J20.9,"Acute bronchitis, unspecified",Respiratory,1,2015-01-01,9999-12-31
+16,4016,M54.5,Low back pain,Musculoskeletal,1,2015-01-01,9999-12-31
+17,4017,M17.11,"Unilateral primary osteoarthritis, right knee",Musculoskeletal,1,2015-01-01,9999-12-31
+18,4018,M25.561,Pain in right knee,Musculoskeletal,1,2015-01-01,9999-12-31
+19,4019,M79.7,Fibromyalgia,Musculoskeletal,1,2015-01-01,9999-12-31
+20,4020,M16.11,"Unilateral primary osteoarthritis, right hip",Musculoskeletal,1,2015-01-01,9999-12-31
+21,4021,F41.1,Generalized anxiety disorder,Behavioral Health,1,2015-01-01,9999-12-31
+22,4022,F32.9,"Major depressive disorder, single episode, unspecified",Behavioral Health,1,2015-01-01,9999-12-31
+23,4023,F33.1,"Major depressive disorder, recurrent, moderate",Behavioral Health,1,2015-01-01,9999-12-31
+24,4024,F17.210,"Nicotine dependence, cigarettes, uncomplicated",Behavioral Health,1,2015-01-01,9999-12-31
+25,4025,F43.10,"Post-traumatic stress disorder, unspecified",Behavioral Health,1,2015-01-01,9999-12-31
+26,4026,N18.3,"Chronic kidney disease, stage 3",Genitourinary,1,2015-01-01,9999-12-31
+27,4027,N39.0,"Urinary tract infection, site not specified",Genitourinary,1,2015-01-01,9999-12-31
+28,4028,N40.0,Benign prostatic hyperplasia without LUTS,Genitourinary,1,2015-01-01,9999-12-31
+29,4029,Z00.00,Encounter for general adult medical exam without abnormal findings,Preventive,1,2015-01-01,9999-12-31
+30,4030,Z23,Encounter for immunization,Preventive,1,2015-01-01,9999-12-31
+31,4031,Z12.11,Encounter for screening for malignant neoplasm of colon,Preventive,1,2015-01-01,9999-12-31
+32,4032,Z01.419,Encounter for gynecological exam without abnormal findings,Preventive,1,2015-01-01,9999-12-31
+33,4033,K21.9,Gastro-esophageal reflux disease without esophagitis,Digestive,1,2015-01-01,9999-12-31
+34,4034,K57.30,Diverticulosis of large intestine without perforation,Digestive,1,2015-01-01,9999-12-31
+35,4035,K80.20,Calculus of gallbladder without cholecystitis,Digestive,1,2015-01-01,9999-12-31
+36,4036,R10.9,Unspecified abdominal pain,Symptoms,1,2015-01-01,9999-12-31
+37,4037,R51.9,"Headache, unspecified",Symptoms,1,2015-01-01,9999-12-31
+38,4038,R07.9,"Chest pain, unspecified",Symptoms,1,2015-01-01,9999-12-31
+39,4039,R53.83,Other fatigue,Symptoms,1,2015-01-01,9999-12-31
+40,4040,G43.909,"Migraine, unspecified, not intractable",Neurological,1,2015-01-01,9999-12-31
+41,4041,G47.33,Obstructive sleep apnea,Neurological,1,2015-01-01,9999-12-31
+42,4042,G20,Parkinson's disease,Neurological,1,2015-01-01,9999-12-31
+43,4043,C50.911,Malignant neoplasm of unspecified site of right female breast,Neoplasm,1,2015-01-01,9999-12-31
+44,4044,C34.90,Malignant neoplasm of unspecified part of unspecified bronchus or lung,Neoplasm,1,2015-01-01,9999-12-31
+45,4045,C18.9,"Malignant neoplasm of colon, unspecified",Neoplasm,1,2015-01-01,9999-12-31
+46,4046,L40.0,Psoriasis vulgaris,Skin,1,2015-01-01,9999-12-31
+47,4047,L03.90,"Cellulitis, unspecified",Skin,1,2015-01-01,9999-12-31
+48,4048,D64.9,"Anemia, unspecified",Blood,1,2015-01-01,9999-12-31
+49,4049,O80,Encounter for full-term uncomplicated delivery,Pregnancy,1,2015-01-01,9999-12-31
+50,4050,S72.001A,"Fracture of unspecified part of neck of right femur, initial",Injury,1,2015-01-01,9999-12-31

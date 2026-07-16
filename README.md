@@ -131,6 +131,12 @@ output *cross-workspace*, so exactly one physical, PHI-free copy lands in Analyt
 1. Create the **three workspaces** (Raw, Analytics, Vault) and grant each the minimal audience
    above. Attach a Lakehouse in each.
 2. Land the 13 synthetic Caboodle CSVs at `Files/raw/caboodle_provider/` in the **Raw** workspace.
+   They are **bundled in this repo** under
+   [`sample_data/caboodle_provider/`](sample_data/caboodle_provider/) (synthetic, generated with
+   Tonic Fabricate — no real PHI) so you can run the pipeline immediately; just upload that folder
+   to the Raw Lakehouse. Need more volume for load/variety? Append FK-safe synthetic rows with
+   [`scripts/generate_sample_data.py`](scripts/generate_sample_data.py), e.g.
+   `python scripts/generate_sample_data.py --add-claims 100000 --add-patients 5000 --seed 42`.
 3. Import each notebook into its workspace per the table above (Data Engineering → Import) and
    upload `src/` + `config/` to that workspace's Lakehouse at `Files/accelerator/`.
 4. Provide the tokenization **pepper**:

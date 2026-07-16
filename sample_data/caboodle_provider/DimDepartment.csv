@@ -1,0 +1,31 @@
+DepartmentKey,DepartmentDurableKey,DepartmentID,DepartmentName,ServiceLine,DepartmentSpecialty,_IsCurrent,EffectiveDate,ExpirationDate
+1,1001,DEP0001,Family Medicine Clinic,Primary Care,Family Medicine,1,2015-01-01,9999-12-31
+2,1002,DEP0002,Internal Medicine Clinic,Primary Care,Internal Medicine,1,2015-01-01,9999-12-31
+3,1003,DEP0003,Pediatrics Clinic,Primary Care,Pediatrics,1,2015-01-01,9999-12-31
+4,1004,DEP0004,Cardiology,Cardiovascular,Cardiology,1,2015-01-01,9999-12-31
+5,1005,DEP0005,Cardiac Cath Lab,Cardiovascular,Cardiology,1,2015-01-01,9999-12-31
+6,1006,DEP0006,Orthopedic Surgery,Surgical Services,Orthopedic Surgery,1,2015-01-01,9999-12-31
+7,1007,DEP0007,General Surgery,Surgical Services,General Surgery,1,2015-01-01,9999-12-31
+8,1008,DEP0008,OB/GYN,Women's Health,OB/GYN,1,2015-01-01,9999-12-31
+9,1009,DEP0009,Labor & Delivery,Women's Health,OB/GYN,1,2015-01-01,9999-12-31
+10,1010,DEP0010,Psychiatry,Behavioral Health,Psychiatry,1,2015-01-01,9999-12-31
+11,1011,DEP0011,Dermatology,Ambulatory Specialty,Dermatology,1,2015-01-01,9999-12-31
+12,1012,DEP0012,Emergency Department,Emergency Services,Emergency Medicine,1,2015-01-01,9999-12-31
+13,1013,DEP0013,Anesthesiology,Perioperative,Anesthesiology,1,2015-01-01,9999-12-31
+14,1014,DEP0014,Radiology,Imaging,Radiology,1,2015-01-01,9999-12-31
+15,1015,DEP0015,Neurology,Neurosciences,Neurology,1,2015-01-01,9999-12-31
+16,1016,DEP0016,Oncology,Cancer Care,Oncology,1,2015-01-01,9999-12-31
+17,1017,DEP0017,Infusion Center,Cancer Care,Oncology,1,2015-01-01,9999-12-31
+18,1018,DEP0018,Nephrology,Medicine Subspecialty,Nephrology,1,2015-01-01,9999-12-31
+19,1019,DEP0019,Dialysis Unit,Medicine Subspecialty,Nephrology,1,2015-01-01,9999-12-31
+20,1020,DEP0020,Endocrinology,Medicine Subspecialty,Endocrinology,1,2015-01-01,9999-12-31
+21,1021,DEP0021,Gastroenterology,Medicine Subspecialty,Gastroenterology,1,2015-01-01,9999-12-31
+22,1022,DEP0022,Endoscopy Suite,Medicine Subspecialty,Gastroenterology,1,2015-01-01,9999-12-31
+23,1023,DEP0023,Pulmonology,Medicine Subspecialty,Pulmonology,1,2015-01-01,9999-12-31
+24,1024,DEP0024,Urology,Surgical Services,Urology,1,2015-01-01,9999-12-31
+25,1025,DEP0025,Primary Care - North,Primary Care,Family Medicine,1,2015-01-01,9999-12-31
+26,1026,DEP0026,Primary Care - South,Primary Care,Internal Medicine,1,2015-01-01,9999-12-31
+27,1027,DEP0027,Primary Care - East,Primary Care,Family Medicine,1,2015-01-01,9999-12-31
+28,1028,DEP0028,Primary Care - West,Primary Care,Internal Medicine,1,2015-01-01,9999-12-31
+29,1029,DEP0029,Urgent Care,Ambulatory,Family Medicine,1,2015-01-01,9999-12-31
+30,1030,DEP0030,Pain Management,Perioperative,Anesthesiology,1,2015-01-01,9999-12-31

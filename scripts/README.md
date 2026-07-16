@@ -46,3 +46,23 @@ created the vault:
 Add `-DisablePublicAccess` (PowerShell) / `--disable-public-access` (bash) to lock the vault
 down, then create a **Fabric managed private endpoint** to it and approve the pending
 connection. Real PHI must never traverse a public vault endpoint.
+
+## `generate_sample_data.py`
+
+Appends more **synthetic** rows to the bundled Caboodle dataset in
+[`../sample_data/caboodle_provider/`](../sample_data/caboodle_provider/) while keeping every
+foreign key valid. Curated dimension/provider tables are treated as fixed reference data; only
+patients and the fact tables (claims, encounters, risk scores) grow, referencing existing keys.
+Standard library only — no `pip install`.
+
+```bash
+# Append 100k claims + 5k patients, reproducibly
+python scripts/generate_sample_data.py --add-claims 100000 --add-patients 5000 --seed 42
+
+# Grow every fact table a bit, against a copy of the data
+python scripts/generate_sample_data.py --data-dir /tmp/mydata \
+  --add-patients 2000 --add-claims 20000 --add-encounters 10000 --add-risk-scores 5000
+```
+
+Everything it emits is synthetic — it never produces real PHI. Run `--help` for all options.
+
