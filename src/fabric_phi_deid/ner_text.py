@@ -274,7 +274,9 @@ def redact_text(
         elif replacement == "remove":
             repl = ""
         else:  # token
-            token = tokenize(original, pepper or "", namespace=f"{namespace}:{f.entity_type}", length=12)
+            token = tokenize(
+                original, pepper or "", namespace=f"{namespace}:{f.entity_type}", length=12
+            )
             repl = f"[{f.entity_type}:{token}]"
         out = out[: f.start] + repl + out[f.end :]
     return out
@@ -292,7 +294,9 @@ def scan_texts(
     for value in texts:
         if not value:
             continue
-        for f in analyze_text(str(value), entities, score_threshold=score_threshold, backend=backend):
+        for f in analyze_text(
+            str(value), entities, score_threshold=score_threshold, backend=backend
+        ):
             hits[f.entity_type] += 1
     return dict(hits)
 
@@ -393,7 +397,12 @@ def scan_text_column(
     def _types(v):  # noqa: ANN001
         if v is None:
             return []
-        return [f.entity_type for f in analyze_text(str(v), entities, score_threshold=score_threshold, backend=backend)]
+        return [
+            f.entity_type
+            for f in analyze_text(
+                str(v), entities, score_threshold=score_threshold, backend=backend
+            )
+        ]
 
     types_udf = F.udf(_types, T.ArrayType(T.StringType()))
     scan_df = df.select(column)

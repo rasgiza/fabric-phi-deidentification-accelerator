@@ -135,9 +135,9 @@ def measure_k_anonymity(
 
     examples: list[tuple[tuple, int]] = []
     if include_examples:
-        examples = sorted(
-            ((key, len(idx)) for key, idx in classes.items()), key=lambda kv: kv[1]
-        )[:top]
+        examples = sorted(((key, len(idx)) for key, idx in classes.items()), key=lambda kv: kv[1])[
+            :top
+        ]
 
     return KAnonymityReport(
         quasi_identifiers=quasi_identifiers,
@@ -228,7 +228,9 @@ def measure_l_diversity(
     )
 
 
-def _total_variation_distance(local: Counter, total_local: int, global_dist: Mapping[Any, float]) -> float:
+def _total_variation_distance(
+    local: Counter, total_local: int, global_dist: Mapping[Any, float]
+) -> float:
     """0.5 * sum_v |p_local(v) - p_global(v)| over the union of support. In [0, 1]."""
     if total_local == 0:
         return 0.0
@@ -285,7 +287,9 @@ def measure_t_closeness(
     quasi_identifiers = list(quasi_identifiers)
     classes = equivalence_classes(records, quasi_identifiers)
 
-    global_counter: Counter = Counter(records[i].get(sensitive_attribute) for i in range(len(records)))
+    global_counter: Counter = Counter(
+        records[i].get(sensitive_attribute) for i in range(len(records))
+    )
     total = sum(global_counter.values())
     global_dist: dict[Any, float] = (
         {v: c / total for v, c in global_counter.items()} if total else {}

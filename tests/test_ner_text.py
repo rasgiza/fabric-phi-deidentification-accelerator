@@ -50,15 +50,21 @@ def test_redact_label_removes_clear_values():
 
 
 def test_redact_remove_deletes_spans():
-    out = redact_text("email a@b.com now", entities=["EMAIL_ADDRESS"], backend="regex", replacement="remove")
+    out = redact_text(
+        "email a@b.com now", entities=["EMAIL_ADDRESS"], backend="regex", replacement="remove"
+    )
     assert "a@b.com" not in out
     assert out == "email  now"
 
 
 def test_redact_token_is_deterministic_and_keyed():
     text = "email a@b.com"
-    out1 = redact_text(text, entities=["EMAIL_ADDRESS"], backend="regex", replacement="token", pepper=PEPPER)
-    out2 = redact_text(text, entities=["EMAIL_ADDRESS"], backend="regex", replacement="token", pepper=PEPPER)
+    out1 = redact_text(
+        text, entities=["EMAIL_ADDRESS"], backend="regex", replacement="token", pepper=PEPPER
+    )
+    out2 = redact_text(
+        text, entities=["EMAIL_ADDRESS"], backend="regex", replacement="token", pepper=PEPPER
+    )
     assert out1 == out2
     assert "a@b.com" not in out1
     assert "[EMAIL_ADDRESS:" in out1

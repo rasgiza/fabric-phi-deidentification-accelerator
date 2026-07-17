@@ -157,4 +157,6 @@ def evaluate_spans(
             remaining.pop(best_i)
         else:
             fp += 1
-    return ClassificationMetrics(true_positives=tp, false_positives=fp, false_negatives=len(remaining))
+    return ClassificationMetrics(
+        true_positives=tp, false_positives=fp, false_negatives=len(remaining)
+    )

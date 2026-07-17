@@ -403,7 +403,7 @@ def main() -> None:
         raise SystemExit(f"Data dir not found: {args.data_dir}")
     if (args.add_patients | args.add_claims | args.add_encounters | args.add_risk_scores) == 0:
         parser.error(
-            "Nothing to do — pass at least one of --add-patients/--add-claims/"
+            "Nothing to do - pass at least one of --add-patients/--add-claims/"
             "--add-encounters/--add-risk-scores."
         )
 

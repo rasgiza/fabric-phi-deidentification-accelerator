@@ -41,6 +41,19 @@ path = "src/fabric_phi_deid/__init__.py"
 [tool.hatch.build.targets.wheel]
 packages = ["src/fabric_phi_deid"]
 
+# The sdist ships the installable package + its metadata only. The synthetic sample dataset
+# (~50 MB under sample_data/), notebooks, reports, and docs are repo assets for adopters, not
+# part of the distributable — excluding them keeps the release tarball small.
+[tool.hatch.build.targets.sdist]
+include = [
+    "src/fabric_phi_deid",
+    "config/deid_rules.yaml",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "pyproject.toml",
+]
+
 # --------------------------------------------------------------------------------------
 # Tooling
 # --------------------------------------------------------------------------------------
