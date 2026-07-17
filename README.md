@@ -1,5 +1,11 @@
 # Fabric PHI De-Identification & Tokenization Accelerator
 
+[![CI](https://github.com/rasgiza/fabric-phi-deidentification-accelerator/actions/workflows/ci.yml/badge.svg)](https://github.com/rasgiza/fabric-phi-deidentification-accelerator/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/rasgiza/fabric-phi-deidentification-accelerator/actions/workflows/codeql.yml/badge.svg)](https://github.com/rasgiza/fabric-phi-deidentification-accelerator/actions/workflows/codeql.yml)
+[![Release](https://img.shields.io/github/v/release/rasgiza/fabric-phi-deidentification-accelerator?sort=semver)](https://github.com/rasgiza/fabric-phi-deidentification-accelerator/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
+
 > ⚠️ **SYNTHETIC DATA ONLY.** This accelerator is a **reference / blueprint pattern**
 > designed and demonstrated on **synthetic** Epic-Caboodle data (generated with Tonic
 > Fabricate). It is **NOT a certified de-identification service.** Productionizing on
@@ -11,6 +17,41 @@ A two-tier solution accelerator for Microsoft Fabric that shows how to **classif
 control access to, and physically de-identify** Protected Health Information (PHI) on a
 Lakehouse medallion (Bronze → Silver → Gold), so that the Gold layer that Power BI and
 Copilot point at contains **no PHI by construction**.
+
+### 👉 New here? Start with the **[QUICKSTART](QUICKSTART.md)** — 6 steps to a PHI-free Gold layer.
+
+## What you'll build
+
+```mermaid
+flowchart LR
+    CSV[13 synthetic<br/>Caboodle CSVs] --> B[bronze_*]
+    subgraph RAW["RAW workspace (~3 engineers)"]
+        B --> S[silver_*]
+        S --> D[02b_silver_deid<br/>de-identify + tokenize]
+    end
+    subgraph ANALYTICS["ANALYTICS workspace (analysts, Copilot)"]
+        D -->|cross-workspace| SD[silver_deid_*]
+        SD --> G[gold_safe_*<br/>PHI-free star]
+        G --> BI[Power BI + Copilot]
+        SC{{NB_scorecard<br/>asserts 0/18 identifiers}}
+    end
+    subgraph VAULT["VAULT workspace (~2 approvers)"]
+        XW[(xwalk_* crosswalk)]
+        RE[NB_reidentify<br/>break-glass, audited]
+    end
+    D -.->|tokens only| XW
+    G --> SC
+```
+
+The Gold layer that Power BI and Copilot read contains **no PHI by construction** —
+`NB_scorecard` proves it by asserting **0 of the 18 HIPAA Safe Harbor identifiers** survive.
+
+## Prerequisites
+
+- A **Microsoft Fabric** capacity (Trial capacity works) with permission to create workspaces.
+- The **Data Engineering** experience enabled.
+- Python 3.11+ locally to run the tests or the sample-data generator (optional — the notebooks run in Fabric).
+- *(Production path only)* An Azure subscription for Key Vault. **Not** needed for the synthetic demo.
 
 > **Positioning (new customers):** lead with **Microsoft Fabric as Microsoft's primary data
 > governance solution**, and the **OneLake catalog as its unified governance foundation** — a
@@ -153,6 +194,14 @@ output *cross-workspace*, so exactly one physical, PHI-free copy lands in Analyt
    **Vault:** `NB_reidentify` only when a governed re-identification is approved.
 6. For the security demo, apply [`sql/rls_cls_policies.sql`](sql/rls_cls_policies.sql) and
    follow [docs/demo_runbook.md](docs/demo_runbook.md).
+
+## Cleanup
+
+Delete the three Fabric workspaces (Raw, Analytics, Vault) — this removes their Lakehouses and
+all `bronze_*`, `silver_*`, `silver_deid_*`, `gold_safe_*`, and `xwalk_*` tables in one step.
+If you followed the **production** pepper path, also delete the Azure Key Vault / resource
+group provisioned by [`scripts/provision_keyvault.ps1`](scripts/provision_keyvault.ps1). No
+other Azure resources are created by the synthetic demo.
 
 ## Compliance boundary
 
