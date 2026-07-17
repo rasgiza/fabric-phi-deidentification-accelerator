@@ -3,7 +3,7 @@
   "version": "4.0",
   "datasetReference": {
     "byConnection": {
-      "connectionString": "Data Source=\"powerbi://api.powerbi.com/v1.0/myorg/PHI-Raw\";initial catalog=\"gold_demo_model\";integrated security=ClaimsToken;semanticmodelid=45a8ebc8-ed8e-4632-ae4a-68e942c2349e"
+      "connectionString": "Data Source=\"powerbi://api.powerbi.com/v1.0/myorg/PHI-Raw\";initial catalog=\"gold_unsafe_model\";integrated security=ClaimsToken;semanticmodelid=REPLACE_WITH_YOUR_SEMANTIC_MODEL_ID"
     }
   }
 }

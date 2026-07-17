@@ -10,6 +10,12 @@ All notable changes to this project are documented here. The format is based on
 - Bundled synthetic sample dataset under `sample_data/caboodle_provider/` — the 13 Caboodle
   provider CSVs (generated with Tonic Fabricate, no real PHI) so the Bronze→Silver→Gold
   pipeline runs immediately after clone.
+- Portable Power BI assets under `reports/`: a committed **Direct Lake semantic model**
+  (`Gold Safe Analytics.SemanticModel`, TMDL) over the `gold_safe_*` tables, with the
+  `After PHI Deidentified` report bound to it **by path** so the PBIP opens self-contained.
+  Tenant-specific values (SQL endpoint, semantic-model GUIDs) are replaced with documented
+  placeholders; `reports/README.md` covers the one-edit rebind. The `Before`/`Toggle`
+  baseline reports carry placeholder connections for the user's own `gold_*` model.
 - `scripts/generate_sample_data.py`: standard-library generator that appends more **synthetic**
   patients and fact rows (claims, encounters, risk scores) to the bundled dataset while
   preserving referential integrity to existing dimension/provider keys.

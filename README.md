@@ -108,6 +108,11 @@ fabric-phi-deid-accelerator/
     NB_scorecard.ipynb          ← compliance: assert 0/18 identifiers survive into gold_safe_*
   sql/
     rls_cls_policies.sql        ← OneLake / Warehouse RLS + CLS (defense-in-depth demo)
+  reports/
+    Gold Safe Analytics.SemanticModel/  ← committed Direct Lake model over gold_safe_* (TMDL)
+    After PHI Deidentified.pbip         ← safe report (byPath to the model — self-contained)
+    Before PHI Exposed.pbip / PHI Toggle Demo.pbip  ← unsafe "before" baseline (rebind to your gold_*)
+    README.md                   ← rebind steps + which names are examples
   tier0/
     README.md                   ← catalog onboarding runbook + classification taxonomy
     inventory_catalog.py        ← Catalog Search API → data inventory
@@ -194,6 +199,11 @@ output *cross-workspace*, so exactly one physical, PHI-free copy lands in Analyt
    **Vault:** `NB_reidentify` only when a governed re-identification is approved.
 6. For the security demo, apply [`sql/rls_cls_policies.sql`](sql/rls_cls_policies.sql) and
    follow [docs/demo_runbook.md](docs/demo_runbook.md).
+7. **(Optional) Open the Power BI report.** A thin report + committed Direct Lake semantic
+   model ship in [`reports/`](reports/README.md). Open `After PHI Deidentified.pbip` in Power
+   BI Desktop and make the one required edit — point the model at your Analytics Lakehouse SQL
+   endpoint (replace the `REPLACE_WITH_YOUR_SQL_ENDPOINT` placeholder). Workspace/Lakehouse
+   names in the shipped files are examples. See [reports/README.md](reports/README.md).
 
 ## Cleanup
 

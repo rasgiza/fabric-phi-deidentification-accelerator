@@ -6,6 +6,11 @@
       "report": {
         "path": "After PHI Deidentified.Report"
       }
+    },
+    {
+      "semanticModel": {
+        "path": "Gold Safe Analytics.SemanticModel"
+      }
     }
   ],
   "settings": {

@@ -1,0 +1,7 @@
+expression DatabaseQuery =
+		let
+		    Source = Sql.Database("REPLACE_WITH_YOUR_SQL_ENDPOINT.datawarehouse.fabric.microsoft.com", "lh_analytics")
+		in
+		    Source
+	lineageTag: 33918014-5ba1-4395-b535-69f8715aa640
+

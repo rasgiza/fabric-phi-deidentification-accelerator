@@ -69,6 +69,14 @@ and writes the de-identified copy that Analytics reads cross-workspace.
 PHI-free evidence artifact to `Files/audit/`. Green = the Gold layer is safe for Power BI
 and Copilot.
 
+### 7. (Optional) Open the Power BI report
+A ready-made report + Direct Lake semantic model ship in [`reports/`](reports/). Open
+`After PHI Deidentified.pbip` in Power BI Desktop, then make the **one** required edit:
+point the model at your Analytics Lakehouse SQL endpoint (placeholder
+`REPLACE_WITH_YOUR_SQL_ENDPOINT` in
+[`Gold Safe Analytics.SemanticModel/definition/expressions.tmdl`](reports/Gold%20Safe%20Analytics.SemanticModel/definition/expressions.tmdl)).
+Full steps — including the optional "before" reports — are in [reports/README.md](reports/README.md).
+
 ## Cleanup
 Delete the three Fabric workspaces (this removes their Lakehouses and all `bronze_*`,
 `silver_*`, `silver_deid_*`, `gold_safe_*`, and `xwalk_*` tables). For the production path,
