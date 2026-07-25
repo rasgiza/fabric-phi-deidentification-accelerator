@@ -46,6 +46,23 @@ flowchart LR
 The Gold layer that Power BI and Copilot read contains **no PHI by construction** —
 `NB_scorecard` proves it by asserting **0 of the 18 HIPAA Safe Harbor identifiers** survive.
 
+### Auditing & evidence
+
+Every run is auditable — the accelerator does not just transform data, it **produces proof**:
+
+- **Direct-identifier gates (hard fail):** no SSN / phone / email patterns, MRN fully
+  tokenized, no raw date-of-birth, ZIP ≤ 3 digits. Any failure raises and blocks Gold.
+- **Residual re-identification risk (advisory metrics):** `NB_scorecard` computes
+  **k-anonymity, l-diversity, and t-closeness** over the quasi-identifier set
+  (`BirthYear, Gender, Race, ZIP`) via [`privacy_metrics.py`](src/fabric_phi_deid/privacy_metrics.py)
+  — so you get quantified disclosure risk, not just "the identifiers are gone."
+- **Determination governance:** the de-id method, reviewer, and review-by (expiry) date are
+  recorded, so an expired Expert Determination is flagged before real PHI is processed.
+- **PHI-free evidence artifact:** each run writes a metadata-only
+  `scorecard_<id>.json` to `Files/audit/` (thresholds, checks, verdicts, determination —
+  **no data values**), plus a per-run manifest and config fingerprint from
+  [`audit.py`](src/fabric_phi_deid/audit.py). These are safe to keep as a compliance trail.
+
 ## Prerequisites
 
 - A **Microsoft Fabric** capacity (Trial capacity works) with permission to create workspaces.
@@ -98,6 +115,7 @@ fabric-phi-deid-accelerator/
     config.py                   ← config schema validation + coverage linter (fail-fast on drift)
     audit.py                    ← PHI-free run manifests + config fingerprint + audit logger
     validation.py               ← residual-PHI regex scanners (SSN / phone / email)
+    privacy_metrics.py          ← residual re-id risk: k-anonymity / l-diversity / t-closeness (+ Spark)
   notebooks/
     01_bronze_ingest.ipynb      ← foundation: 13 CSVs → typed bronze_* Delta
     02_silver_conform.ipynb     ← foundation: current rows, derived cols, referential integrity
@@ -105,7 +123,7 @@ fabric-phi-deid-accelerator/
     03_gold_star.ipynb          ← foundation: star schema (the "before" — PHI reaches Gold)
     03b_gold_safe.ipynb         ← PHI-free star schema → gold_safe_*
     NB_reidentify.ipynb         ← RESTRICTED: token → original value (Vault workspace, ~2 people)
-    NB_scorecard.ipynb          ← compliance: assert 0/18 identifiers survive into gold_safe_*
+    NB_scorecard.ipynb          ← compliance: 0/18 identifiers + k-anon/l-div/t-closeness + evidence JSON
   sql/
     rls_cls_policies.sql        ← OneLake / Warehouse RLS + CLS (defense-in-depth demo)
   reports/
