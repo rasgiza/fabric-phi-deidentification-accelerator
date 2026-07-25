@@ -64,6 +64,13 @@ the repo's `src/` and `config/` folders into **each** workspace's Lakehouse at
 `02b_silver_deid` is the **single privileged crossing point** — it runs in Raw, reads raw PHI,
 and writes the de-identified copy that Analytics reads cross-workspace.
 
+**Pick your HIPAA method (optional).** The accelerator ships both §164.514(b) methods as
+profiles in [`config/deid_rules.yaml`](config/deid_rules.yaml): **Safe Harbor** (dates → year,
+ZIP → 3-digit, age 90+ capped) and **Expert Determination** (per-patient date shift that
+preserves intervals). It uses `active_profile` from that file by default. To switch at run
+time without editing the YAML, set `PROFILE_OVERRIDE = "safe_harbor"` or
+`"expert_determination"` in the selector cell near the top of `02b_silver_deid`.
+
 ### 6. Confirm the proof gate
 `NB_scorecard` asserts **0/18 Safe Harbor identifiers** in `gold_safe_*` and writes a
 PHI-free evidence artifact to `Files/audit/`. Green = the Gold layer is safe for Power BI
