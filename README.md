@@ -136,6 +136,7 @@ fabric-phi-deid-accelerator/
     inventory_catalog.py        ← Catalog Search API → data inventory
   docs/
     positioning_and_scope.md    ← maturity ladder + "not a certified service" boundary
+    deidentification_standard.md ← controlled policy template (10 sections) + control→Fabric crosswalk
     enforcement_models.md       ← transform-at-rest vs mask-at-query; where Purview stops
     security_model.md           ← 3-workspace isolation, planes, EIS security one-pager
     hipaa_compliance.md         ← shared-responsibility; is Fabric HIPAA compliant?
