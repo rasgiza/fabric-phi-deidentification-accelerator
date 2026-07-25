@@ -229,3 +229,29 @@ Evidence this standard + the accelerator can produce if challenged:
 | Risk assessment | (accelerator) | `privacy_metrics.py`, `NB_scorecard` |
 | Evidence / audit | Fabric audit log, Purview lineage | `audit.py`, `Files/audit/scorecard_*.json` |
 | Isolation of re-id | Separate workspace + break-glass | Vault workspace, `NB_reidentify` |
+
+## Appendix C — Classification → rulebook crosswalk (Tier 0 → Tier 3)
+
+**The bridge:** the sensitivity classification applied in the OneLake catalog / Purview (Tier 0)
+becomes the input rulebook that drives de-identification (Tier 3). *The label you assign in the
+catalog today becomes the rule that de-identifies the column tomorrow.* This makes the policy
+self-consistent: an auditor can follow a single column from **label → rule → transformation →
+evidence**.
+
+| Purview / catalog classification | Example column(s) | Rulebook strategy ([deid_rules.yaml](../config/deid_rules.yaml)) | Proven by |
+|----------------------------------|-------------------|------------------------------------------------------------------|-----------|
+| Direct identifier — **Name** | `FirstName`, `LastName`, `PatientName` | `synthesize` (irreversible) | scorecard: no name patterns survive |
+| Direct identifier — **MRN / stable ID** | `MRN`, `NPI`, `LicenseNumber`, `DEANumber` | `tokenize` (HMAC, prefixed) | scorecard: `PT-`/`NP-` prefix check |
+| Direct identifier — **SSN / phone / email** | (pattern-detected) | deny-by-default `suppress` | scorecard: SSN/phone/email regex scan |
+| Quasi-identifier — **Date** | `DateOfBirth`, `ServiceDate` | `generalize(year)` or `date_shift` | scorecard: no `DateOfBirth`; `BirthYear` only |
+| Quasi-identifier — **Geography** | patient `ZIP` | `generalize(zip3)`; `000` low-pop | scorecard: ZIP ≤ 3 digits |
+| Quasi-identifier — **Age** | `Age` | `generalize(age_cap=90)` | k-anonymity metric |
+| Sensitive attribute | `Ethnicity`, diagnosis | passthrough + monitored | l-diversity / t-closeness metrics |
+| **Unclassified / new column** | any | **deny-by-default `suppress`** | config coverage linter fails closed |
+
+| Control | Fabric / repo enforcement |
+|---------|---------------------------|
+| Label taxonomy → rulebook mapping | [tier0/README.md](../tier0/README.md), [config/deid_rules.yaml](../config/deid_rules.yaml) |
+| Inventory of classified columns | `tier0/inventory_catalog.py` (Catalog Search API) |
+| Fail-closed on unclassified columns | `default_strategy: suppress` + [config.py](../src/fabric_phi_deid/config.py) coverage linter |
+
