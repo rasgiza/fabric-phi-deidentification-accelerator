@@ -20,6 +20,22 @@ Copilot point at contains **no PHI by construction**.
 
 ### 👉 New here? Start with the **[QUICKSTART](QUICKSTART.md)** — 6 steps to a PHI-free Gold layer.
 
+## Table of contents
+
+- [What you'll build](#what-youll-build)
+  - [Auditing and evidence](#auditing-and-evidence)
+- [Free-text PHI and detector quality](#free-text-phi-and-detector-quality)
+- [Prerequisites](#prerequisites)
+- [Why this exists](#why-this-exists)
+- [The two tiers](#the-two-tiers)
+- [Repository layout](#repository-layout)
+- [Quickstart (local)](#quickstart-local)
+- [Quickstart (Fabric)](#quickstart-fabric)
+- [Cleanup](#cleanup)
+- [Compliance boundary](#compliance-boundary)
+
+**Key docs:** [Quickstart](QUICKSTART.md) · [De-Identification Standard](docs/deidentification_standard.md) · [Security model](docs/security_model.md) · [Safe Harbor mapping](docs/safe_harbor_mapping.md) · [HIPAA compliance](docs/hipaa_compliance.md) · [Pre-real-PHI checklist](docs/pre_real_phi_checklist.md) · [Positioning & scope](docs/positioning_and_scope.md)
+
 ## What you'll build
 
 ```mermaid
@@ -46,7 +62,7 @@ flowchart LR
 The Gold layer that Power BI and Copilot read contains **no PHI by construction** —
 `NB_scorecard` proves it by asserting **0 of the 18 HIPAA Safe Harbor identifiers** survive.
 
-### Auditing & evidence
+### Auditing and evidence
 
 Every run is auditable — the accelerator does not just transform data, it **produces proof**:
 
@@ -62,6 +78,29 @@ Every run is auditable — the accelerator does not just transform data, it **pr
   `scorecard_<id>.json` to `Files/audit/` (thresholds, checks, verdicts, determination —
   **no data values**), plus a per-run manifest and config fingerprint from
   [`audit.py`](src/fabric_phi_deid/audit.py). These are safe to keep as a compliance trail.
+
+## Free-text PHI and detector quality
+
+Structured columns are only half the problem — PHI also hides *inside* free-text (clinical
+notes, reason-for-visit, comments). The accelerator detects and removes it, and — critically —
+**measures how well it does so**:
+
+- **Detection + redaction** — [`ner_text.py`](src/fabric_phi_deid/ner_text.py) uses
+  **Microsoft Presidio** (NER for PERSON / LOCATION / DATE_TIME / SSN / phone / email /
+  medical-license) when installed (`pip install 'fabric-phi-deid[nlp]'`), with a
+  dependency-free **regex fallback** for structured identifiers. Redaction can label
+  (`[PERSON]`), deterministically **tokenize** (linkage-preserving), or remove. Spark wrappers
+  (`redact_text_column`, `scan_text_column`) run it at table scale.
+- **Detector quality (recall / precision / F1)** —
+  [`eval_harness.py`](src/fabric_phi_deid/eval_harness.py) scores detectors against a
+  **hand-labeled synthetic fixture** at value level (`evaluate_sets` / `evaluate_flags`) and
+  span level (`evaluate_spans`, overlap-based) — so the free-text claim is a **measured recall
+  number**, not "it looks clean." Recall is the metric that matters for de-id: a missed
+  identifier is a leak.
+
+> Free-text detection is probabilistic. Treat a `[regex-fallback]` posture as
+> **detection-incomplete** — install the `nlp` extra for real notes, and publish the recall
+> from the eval harness alongside the scorecard.
 
 ## Prerequisites
 
@@ -116,6 +155,8 @@ fabric-phi-deid-accelerator/
     audit.py                    ← PHI-free run manifests + config fingerprint + audit logger
     validation.py               ← residual-PHI regex scanners (SSN / phone / email)
     privacy_metrics.py          ← residual re-id risk: k-anonymity / l-diversity / t-closeness (+ Spark)
+    ner_text.py                 ← free-text PHI detection + redaction (Presidio NER, regex fallback, Spark)
+    eval_harness.py             ← detector quality: precision / recall / F1 (value + span level)
   notebooks/
     01_bronze_ingest.ipynb      ← foundation: 13 CSVs → typed bronze_* Delta
     02_silver_conform.ipynb     ← foundation: current rows, derived cols, referential integrity
@@ -150,7 +191,7 @@ fabric-phi-deid-accelerator/
   SECURITY.md  CONTRIBUTING.md  CHANGELOG.md  CODEOWNERS  LICENSE
 ```
 
-## Quickstart (local — logic only)
+## Quickstart (local)
 
 ```powershell
 python -m pip install -e ".[dev]"

@@ -129,6 +129,7 @@ without exposing the original value.
 | Combination (quasi-identifier) attacks | Assessed | [src/fabric_phi_deid/privacy_metrics.py](../src/fabric_phi_deid/privacy_metrics.py) (equivalence classes) |
 | Cross-dataset linkage | Assessed | `[manual analyst review — document linkable datasets]` |
 | External public datasets | Assessed | `[manual analyst review — document external sources considered]` |
+| Free-text (clinical notes) identifiers | Detected + measured | [ner_text.py](../src/fabric_phi_deid/ner_text.py) (Presidio NER) + [eval_harness.py](../src/fabric_phi_deid/eval_harness.py) recall / F1 |
 
 Quantitative metrics are computed automatically and persisted as evidence; **linkage against
 external datasets is a documented manual review** performed by `[Privacy / Data Science]` before
@@ -161,6 +162,7 @@ Retain the following as the litigation / OCR evidence trail:
 | De-identification job logs | audit logger + per-run manifest ([audit.py](../src/fabric_phi_deid/audit.py)) | Spark/notebook run history |
 | Config fingerprint (what rules ran) | `config_fingerprint()` in each manifest | — |
 | Scorecard / risk assessment | PHI-free `scorecard_<id>.json` in `Files/audit/` | — |
+| Detector quality (recall / F1) | [eval_harness.py](../src/fabric_phi_deid/eval_harness.py) against labeled fixture | — |
 | Approval & determination records | determination method/reviewer/expiry in scorecard artifact | `[signed determination on file]` |
 | Data lineage | — | Purview Data Map lineage |
 | Sensitivity label assignments | Tier 0 classification → rulebook | Purview Information Protection |
