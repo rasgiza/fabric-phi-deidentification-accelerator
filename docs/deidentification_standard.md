@@ -106,6 +106,12 @@ Medical Record Number and other stable identifiers are replaced with **determini
 (same input → same token, so joins survive) rather than deleted, enabling linkage across tables
 without exposing the original value.
 
+> **Tokenization ≠ synthesizing names.** Tokenization is used *only* for identifiers you must be
+> able to link on or re-identify (MRN, NPI, license, DEA). **Names are not tokenized** — they are
+> *synthesized* (replaced with irreversible fake names, stored nowhere). See the full
+> [strategy glossary](safe_harbor_mapping.md#strategy-glossary-which-treatment-each-field-gets-and-why)
+> for which field gets which treatment and why.
+
 | Requirement | Standard | Enforcement in this repo |
 |-------------|----------|--------------------------|
 | Algorithm | HMAC-SHA256 with a secret pepper | [src/fabric_phi_deid/tokenization.py](../src/fabric_phi_deid/tokenization.py) |
