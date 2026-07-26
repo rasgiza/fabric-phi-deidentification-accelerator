@@ -28,6 +28,7 @@ Copilot point at contains **no PHI by construction**.
 - [Prerequisites](#prerequisites)
 - [Why this exists](#why-this-exists)
 - [The two tiers](#the-two-tiers)
+- [De-identification strategies](#de-identification-strategies)
 - [Repository layout](#repository-layout)
 - [Quickstart (local)](#quickstart-local)
 - [Quickstart (Fabric)](#quickstart-fabric)
@@ -139,6 +140,28 @@ reporting, and AI **without** BAA constraints.
 columns) becomes the input rulebook ([`config/deid_rules.yaml`](config/deid_rules.yaml))
 that drives the Tier 3 de-identification engine. *The classification you do in the catalog
 today becomes the rulebook that de-identifies your data tomorrow.*
+
+## De-identification strategies
+
+Every column gets exactly **one** strategy, chosen by whether it has analytic value and whether
+you ever need to **link on it** or **recover it**. Full per-field mapping:
+[docs/safe_harbor_mapping.md](docs/safe_harbor_mapping.md#strategy-glossary-which-treatment-each-field-gets-and-why).
+
+| Strategy | What it does | Reversible? | Example fields |
+|----------|--------------|-------------|----------------|
+| **tokenize** | Deterministic HMAC token (same input → same token); keeps records joinable | **Yes** — governed re-id via Vault | `MRN`→`PT-`, `NPI`→`NP-`, `LicenseNumber`, `DEANumber` |
+| **synthesize** | Replaces with **realistic fake data** (e.g. a fake name); not derived from the original | **No** — original discarded | `FirstName`, `LastName`, `PatientName`, provider names |
+| **generalize** | Reduces precision: date → year, ZIP → 3-digit, age → cap 90 | No | `DateOfBirth`, `ZIP`, `Age`, `ServiceDate` |
+| **date_shift** | *(Expert Determination)* per-patient date offset; **intervals preserved** | No | dates (ED profile) |
+| **suppress** | Drops the value — **the default** for any unlisted column (deny-by-default) | No | `AddressLine1`, `ServiceMonth`, unlisted columns |
+| **passthrough** | Keeps non-identifying values unchanged | n/a | `PatientKey`, `Gender`, `Race`, measures |
+| **redact_text** | Detects + removes identifiers **inside** free text | Depends on mode | clinical notes (`ner_text`) |
+
+> **A fake name is `synthesize`, not tokenization.** Synthesizing is **irreversible** fake data
+> with no link back to the person (used for names). **Tokenization** is a **deterministic,
+> governed-reversible** stand-in for IDs you must join on or re-identify (MRN, NPI). Rule of
+> thumb: *need to link or recover it?* → `tokenize`; *direct identifier you never need again?* →
+> `synthesize` (names) / `suppress` (addresses); *useful but too precise?* → `generalize`.
 
 ## Repository layout
 
