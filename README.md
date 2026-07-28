@@ -94,14 +94,23 @@ notes, reason-for-visit, comments). The accelerator detects and removes it, and 
   (`redact_text_column`, `scan_text_column`) run it at table scale.
 - **Detector quality (recall / precision / F1)** —
   [`eval_harness.py`](src/fabric_phi_deid/eval_harness.py) scores detectors against a
-  **hand-labeled synthetic fixture** at value level (`evaluate_sets` / `evaluate_flags`) and
-  span level (`evaluate_spans`, overlap-based) — so the free-text claim is a **measured recall
-  number**, not "it looks clean." Recall is the metric that matters for de-id: a missed
-  identifier is a leak.
+  **shipped synthetic labeled corpus** ([`eval_fixtures.py`](src/fabric_phi_deid/eval_fixtures.py))
+  at value level (`evaluate_sets` / `evaluate_flags`) and span level (`evaluate_spans`,
+  overlap-based). `NB_scorecard` runs this every time and writes an **actual recall number** for
+  the run into the evidence artifact — so the free-text claim is a *measured metric*, not "it
+  looks clean." Recall is the metric that matters for de-id: a missed identifier is a leak.
 
 > Free-text detection is probabilistic. Treat a `[regex-fallback]` posture as
-> **detection-incomplete** — install the `nlp` extra for real notes, and publish the recall
-> from the eval harness alongside the scorecard.
+> **detection-incomplete** — install the `nlp` extra for real notes; the scorecard publishes the
+> run's recall (advisory, never a hard gate).
+
+> **When to use something else.** For **free-text- or LLM-prompt-only** redaction (scrub a
+> document or an outbound LLM call), a dedicated text tool such as
+> [Microsoft Presidio](https://github.com/microsoft/presidio) is the mature choice — and this
+> accelerator *uses* Presidio under the hood rather than reinventing it. This project is for the
+> problem those tools don't solve: **de-identifying structured PHI across a Fabric medallion
+> lakehouse** (Bronze → Silver → Gold) in-tenant, with governance, physical de-id, and
+> policy-linked evidence. Use both — Presidio for the text, this for the warehouse.
 
 ## Prerequisites
 
@@ -180,6 +189,7 @@ fabric-phi-deid-accelerator/
     privacy_metrics.py          ← residual re-id risk: k-anonymity / l-diversity / t-closeness (+ Spark)
     ner_text.py                 ← free-text PHI detection + redaction (Presidio NER, regex fallback, Spark)
     eval_harness.py             ← detector quality: precision / recall / F1 (value + span level)
+    eval_fixtures.py            ← shipped synthetic labeled corpus (measures free-text recall)
   notebooks/
     01_bronze_ingest.ipynb      ← foundation: 13 CSVs → typed bronze_* Delta
     02_silver_conform.ipynb     ← foundation: current rows, derived cols, referential integrity
