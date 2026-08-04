@@ -12,6 +12,20 @@ identifiers** survive into Gold.
 **Time:** ~30–45 min for the synthetic happy path. **Cost:** just your Fabric capacity
 (no Azure Key Vault needed for the synthetic demo).
 
+## Two ways to set this up
+
+- **Option A — One-click launcher (fastest).** Import
+  [`PHI_Deid_Launcher.ipynb`](PHI_Deid_Launcher.ipynb) into any Fabric workspace and
+  **Run All**. It creates the three workspaces + lakehouses, uploads `src/`, `config/`,
+  and the sample data, and imports the notebooks — auto-patching the cross-workspace
+  config so there are **no manual GUID edits**. You still set the pepper and run the
+  notebooks (step 4–6 below). Requires permission to create workspaces.
+- **Option B — Manual (full control).** Follow the 6 steps below and click through the
+  portal yourself. Best if you want to see exactly what each piece does.
+
+The launcher is a convenience wrapper around **the same artifacts** the manual steps use —
+pick whichever you prefer.
+
 ## Prerequisites
 
 - A **Microsoft Fabric** capacity (Trial capacity is fine) and permission to create workspaces.
