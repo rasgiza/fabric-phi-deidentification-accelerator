@@ -30,18 +30,35 @@
 > [README Quickstart (Fabric)](../README.md#quickstart-fabric) and the rationale in
 > [docs/security_model.md](security_model.md).
 
-1. Land the 13 synthetic Caboodle CSVs at `Files/raw/caboodle_provider/`.
-2. Upload the accelerator `src/` and `config/` to `Files/accelerator/`.
-3. Store the pepper in Key Vault (`phi-deid-pepper`).
-4. Run `01` → `02` (foundation) and `03_gold_star` (**before** — writes `gold_*` with raw
+> **⚡ Fastest path — run the launcher.** [`PHI_Deid_Launcher.ipynb`](../PHI_Deid_Launcher.ipynb)
+> performs steps 1–3 for you (and step 3 is a no-op for the synthetic demo). Run it first,
+> then pick up at step 4.
+
+**Done for you by the launcher**
+
+1. Land the 13 synthetic Caboodle CSVs at `Files/raw/caboodle_provider/` in `lh_raw`.
+2. Upload the accelerator `src/` and `config/` to `Files/accelerator/` in **each** lakehouse
+   (`lh_raw`, `lh_analytics`, `lh_vault`) — every notebook imports the package from its own
+   attached lakehouse.
+3. Store the pepper in Key Vault (`phi-deid-pepper`). **Real PHI only** — for the synthetic
+   demo, `02b_silver_deid` and `NB_reidentify` set the same demo pepper themselves, so there
+   is nothing to do here.
+
+**Still manual**
+
+4. Attach each notebook's default lakehouse (Lakehouse explorer → Add): Raw notebooks →
+   `lh_raw`, Analytics notebooks → `lh_analytics`, `NB_reidentify` → `lh_vault`. The Fabric
+   API cannot set this, so the launcher can't either.
+5. Run `01` → `02` (foundation) and `03_gold_star` (**before** — writes `gold_*` with raw
    PHI into `lh_raw`) so you can toggle live.
-5. Produce the **after** layer where it will be governed: attach **`lh_analytic`** as the
-   default lakehouse and upload the accelerator `src/`+`config/` to its `Files/accelerator/`,
-   then run `02b_silver_deid` (in PHI-Raw — the privileged crossing point) and
-   `03b_gold_safe_analytics`. That notebook reads `silver_deid_*` cross-workspace from
-   PHI-Raw `lh_raw` and writes `gold_safe_*` **natively into `lh_analytic`** — one physical
-   copy, no shortcuts, so OneLake security can scope it in Act 4.
-6. Bind two semantic-model variants: one on `gold_*` (Raw), one on `gold_safe_*` (Analytics).
+6. Produce the **after** layer where it will be governed: run `02b_silver_deid` (in PHI-Raw —
+   the privileged crossing point) and then `03b_gold_safe_analytics`. That notebook reads
+   `silver_deid_*` cross-workspace from PHI-Raw `lh_raw` and writes `gold_safe_*` **natively
+   into `lh_analytics`** — one physical copy, no shortcuts, so OneLake security can scope it
+   in Act 4.
+7. Bind two semantic-model variants: one on `gold_*` (Raw), one on `gold_safe_*` (Analytics).
+8. Set the demo personas per the cast table above — **User A must be Viewer** on Analytics,
+   or the Act 5 scoping will not fire.
 
 ## Act 1 — The problem (2 min)
 
@@ -68,7 +85,7 @@ As **Admin**, run `02b_silver_deid` (PHI-Raw — the single privileged crossing 
 `03b_gold_safe_analytics`. Narrate the strategies as counts scroll (no raw data is ever
 shown — that's the point). Call out the topology: the gold notebook **reads** the PHI-free
 `silver_deid_*` cross-workspace from PHI-Raw `lh_raw` and **writes** `gold_safe_*` natively
-into **`lh_analytic`** — raw PHI never enters Analytics, and there's exactly one physical
+into **`lh_analytics`** — raw PHI never enters Analytics, and there's exactly one physical
 copy (no shortcut) for OneLake security to govern next. Then open `gold_safe_dim_patient`:
 - `MRN` → `PT-…` token; **joins still work** (show a fact join by `PatientKey`).
 - `PatientName` → synthetic; `DateOfBirth` → `BirthYear`; `ZIP` → 3 digits; `Age` capped 90.
@@ -76,7 +93,7 @@ Run `NB_scorecard` → **PASS**: 0/18 identifiers in Gold.
 
 ## Act 4 — Govern access with OneLake security (data plane) (5 min)
 
-As **Steward (User B)**, open `lh_analytic` → **Manage OneLake data access**. Because
+As **Steward (User B)**, open `lh_analytics` → **Manage OneLake data access**. Because
 `gold_safe_*` physically lives here (Act 3), the tables are **selectable** in the role editor
 — a shortcut would be greyed out (enforcement defers to the source lakehouse). Build the two
 roles live:
@@ -94,7 +111,7 @@ and every row. That's by design: builders are trusted with their own workspace. 
 exactly why we don't rely on hiding PHI — we removed it. Even a bypassing Contributor finds
 no real MRN in `gold_safe_*`."* Only the **Viewer** analyst (User A) is scoped. **Column**
 (MRN/NPI DENY) and **row** (region) rules are finer-grained than the table-level UI, so
-they're applied on the `lh_analytic` **SQL analytics endpoint** via
+they're applied on the `lh_analytics` **SQL analytics endpoint** via
 [`rls_cls_policies.sql`](../src/sql/rls_cls_policies.sql) — show that file briefly; you'll
 prove it live in Act 5.
 
@@ -102,7 +119,7 @@ prove it live in Act 5.
 
 - As **Analyst (User A)**, open the report on `gold_safe_*` in **Analytics** — full
   analytics, zero PHI, reaching only the tables the `analyst_deid` role granted in Act 4. Try
-  `SELECT MRN …` on the `lh_analytic` SQL endpoint → **denied** by the column DENY in
+  `SELECT MRN …` on the `lh_analytics` SQL endpoint → **denied** by the column DENY in
   [`rls_cls_policies.sql`](../src/sql/rls_cls_policies.sql); show region-scoped RLS (analyst
   sees only their region's facilities).
 - As **Admin**, briefly show `NB_reidentify` lives in the **Vault** workspace only, ~2
