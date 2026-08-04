@@ -90,7 +90,8 @@ The table below is the human-readable summary; the config is what actually runs.
 | Dates (DOB, service, encounter) | Generalize / shift | `generalize(year)` (Safe Harbor) or `date_shift` (Expert Determination); month suppressed |
 | Ages > 89 | Aggregate | `generalize(age_cap=90)` |
 | Device / biometric / images | Remove or redact | `suppress` (present-in-schema); free-text via `ner_text` |
-| **Any unlisted column** | **Remove** | **Deny-by-default `suppress`** — new identifiers cannot leak by omission |
+| **Free-text narrative** (notes, reason-for-visit, comments) | Detect + redact spans in place | `redact_text` \u2014 `ner_text` finds identifier spans and replaces each with its label (Safe Harbor) or an HMAC token (Expert Determination). Applied to `fact_encounter.ReasonForVisitNote`. Recall depends on the backend: Presidio (`[nlp]` extra) covers names/places/dates; the regex fallback covers MRN, phone, email, SSN, card, IP, URL only. |
+| **Any unlisted column** | **Remove** | **Deny-by-default `suppress`** \u2014 new identifiers cannot leak by omission |
 
 | Control | Fabric / repo enforcement |
 |---------|---------------------------|

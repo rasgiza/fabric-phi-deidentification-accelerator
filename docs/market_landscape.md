@@ -18,7 +18,7 @@
 | Data residency | In-tenant, nothing leaves Fabric | Depends on vendor architecture |
 | Cost model | Compute only; no per-record fees | Licensing / per-record / seats |
 | Certified determinations | You own the validation | Often provided by vendor |
-| Free-text NER at scale | Presidio stub → build out | Mature, out-of-the-box |
+| Free-text NER at scale | Wired end-to-end on Presidio (regex fallback); recall you measure yourself | Mature, out-of-the-box, vendor-benchmarked |
 | Support / warranty | Self-supported | Vendor SLA |
 | Time-to-value | Fast for structured Safe Harbor rules | Fast for complex/text-heavy needs |
 
@@ -29,8 +29,10 @@
   against existing Azure commitments.
 - The customer **already generated their synthetic Caboodle data with Tonic**, so Tonic and
   this accelerator are **complementary**: Tonic makes safe test data; this accelerator
-  de-identifies *production* pipelines in-tenant. Tonic **Textual** is the natural upgrade
-  for the free-text NER slot (currently a Presidio stub in `src/ner_text` future work).
+  de-identifies *production* pipelines in-tenant. Tonic **Textual** is the natural upgrade for
+  the free-text slot: `src/fabric_phi_deid/ner_text.py` already runs Presidio (or a regex
+  fallback) over narrative columns, and Textual would swap in as a higher-recall backend behind
+  the same `redact_text` strategy.
 
 ## Recommendation framing for the customer
 

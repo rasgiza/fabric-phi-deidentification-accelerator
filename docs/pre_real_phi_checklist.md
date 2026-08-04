@@ -15,8 +15,13 @@ Do **not** point this pipeline at real PHI until every box is checked and signed
       written determination. Retain it.
 - [ ] The 18 Safe Harbor identifiers are mapped to real source columns and reviewed against
       `docs/safe_harbor_mapping.md` — including **free-text** fields (notes/comments) that
-      may embed identifiers. (This accelerator de-identifies *structured* columns; free-text
-      NER is a separate, additional control — see the roadmap `src/ner_text.py`.)
+      may embed identifiers. Free text is handled by the `redact_text` strategy
+      (`src/fabric_phi_deid/ner_text.py`); confirm every narrative column in your schema has a
+      rule, not just the ones the sample data happens to exercise.
+- [ ] The **Presidio backend is installed** (`pip install 'fabric-phi-deid[nlp]'`) in the Spark
+      environment. Without it `ner_text` falls back to a regex detector that catches structured
+      identifiers (MRN, phone, email, SSN, card, IP, URL) but **not** names, places, or dates.
+      Check the measured free-text recall on the scorecard before trusting the output.
 - [ ] A **Business Associate Agreement (BAA)** and data-use terms cover every workspace and
       downstream consumer of the de-identified output.
 - [ ] Data classification / catalog labels (Tier 0) are complete and are the authoritative

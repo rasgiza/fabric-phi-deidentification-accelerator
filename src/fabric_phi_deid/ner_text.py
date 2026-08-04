@@ -71,7 +71,13 @@ DEFAULT_ENTITIES: tuple[str, ...] = (
     "CREDIT_CARD",
     "IP_ADDRESS",
     "URL",
+    "MEDICAL_RECORD_NUMBER",
 )
+
+# Identifier types Presidio ships no recognizer for. These are ALWAYS matched by regex --
+# including on the Presidio path -- so enabling NER never silently drops them. MRNs are the
+# motivating case: they are HIPAA identifier #7 and appear constantly inside clinical notes.
+_CUSTOM_ENTITIES: tuple[str, ...] = ("MEDICAL_RECORD_NUMBER",)
 
 # Regex fallback recognizers (structured identifiers only). Names/locations are intentionally
 # absent — regex cannot find them without unacceptable false positives.
@@ -82,6 +88,7 @@ _FALLBACK_PATTERNS: dict[str, re.Pattern[str]] = {
     "CREDIT_CARD": re.compile(r"\b(?:\d[ -]?){13,16}\b"),
     "IP_ADDRESS": re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b"),
     "URL": re.compile(r"\bhttps?://[^\s]+\b"),
+    "MEDICAL_RECORD_NUMBER": re.compile(r"\bMRN[-:\s]?\d{4,12}\b", re.IGNORECASE),
 }
 
 
@@ -184,16 +191,25 @@ def analyze_text(
             )
 
     if analyzer is not None:  # pragma: no cover - requires Presidio + model installed
-        results = analyzer.analyze(
-            text=text,
-            entities=entities,
-            language=language,
-            score_threshold=score_threshold,
+        presidio_entities = [e for e in entities if e not in _CUSTOM_ENTITIES]
+        results = (
+            analyzer.analyze(
+                text=text,
+                entities=presidio_entities,
+                language=language,
+                score_threshold=score_threshold,
+            )
+            if presidio_entities
+            else []
         )
         findings = [
             TextFinding(entity_type=r.entity_type, start=r.start, end=r.end, score=float(r.score))
             for r in results
         ]
+        # Presidio has no recognizer for these, so always add the regex hits.
+        custom = [e for e in entities if e in _CUSTOM_ENTITIES]
+        if custom:
+            findings.extend(_analyze_regex(text, custom, score_threshold))
     else:
         findings = _analyze_regex(text, entities, score_threshold)
 

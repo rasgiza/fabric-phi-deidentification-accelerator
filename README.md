@@ -97,7 +97,10 @@ notes, reason-for-visit, comments). The accelerator detects and removes it, and 
   medical-license) when installed (`pip install 'fabric-phi-deid[nlp]'`), with a
   dependency-free **regex fallback** for structured identifiers. Redaction can label
   (`[PERSON]`), deterministically **tokenize** (linkage-preserving), or remove. Spark wrappers
-  (`redact_text_column`, `scan_text_column`) run it at table scale.
+  (`redact_text_column`, `scan_text_column`) run it at table scale. The sample pipeline
+  exercises this for real: `FactEncounter.ReasonForVisitNote` carries synthetic clinical notes
+  and is de-identified by the `redact_text` rule in
+  [`deid_rules.yaml`](config/deid_rules.yaml) on every Silver run.
 - **Detector quality (recall / precision / F1)** —
   [`eval_harness.py`](src/fabric_phi_deid/eval_harness.py) scores detectors against a
   **shipped synthetic labeled corpus** ([`eval_fixtures.py`](src/fabric_phi_deid/eval_fixtures.py))

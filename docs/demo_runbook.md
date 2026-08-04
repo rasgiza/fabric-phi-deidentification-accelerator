@@ -142,5 +142,8 @@ prove it live in Act 5.
   not hidden. Raw PHI is isolated in the Raw workspace.
 - **"Does the catalog expose our data tenant-wide?"** → No; discovery-only. See the
   [EIS one-pager](../tier0/eis_security_one_pager.md).
-- **"What about doctors' notes / free text?"** → NER (Presidio/Tonic Textual) plugs into the
-  same engine; shown as a roadmap slot.
+- **"What about doctors' notes / free text?"** → Already wired, not a roadmap item.
+  `FactEncounter.ReasonForVisitNote` runs through the `redact_text` strategy on every Silver
+  run (Presidio when the `[nlp]` extra is installed, a regex detector otherwise), and the
+  scorecard publishes measured recall against a labeled fixture. Tonic Textual remains the
+  complementary buy for high-volume clinical narrative.

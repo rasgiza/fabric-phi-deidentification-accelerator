@@ -12,11 +12,11 @@ automatically, so the :class:`~fabric_phi_deid.eval_harness.GoldSpan` offsets ar
 construction (never hand-counted).
 
 Entity types match what :mod:`ner_text` emits. Structured identifiers (``US_SSN``,
-``PHONE_NUMBER``, ``EMAIL_ADDRESS``, ``CREDIT_CARD``, ``IP_ADDRESS``, ``URL``) are catchable by
-the dependency-free regex fallback; contextual identifiers (``PERSON``, ``LOCATION``,
-``DATE_TIME``) require the Presidio backend (``pip install 'fabric-phi-deid[nlp]'``). A run on
-the regex fallback will therefore miss the contextual half — which is exactly the honest signal
-the scorecard should surface.
+``PHONE_NUMBER``, ``EMAIL_ADDRESS``, ``CREDIT_CARD``, ``IP_ADDRESS``, ``URL``,
+``MEDICAL_RECORD_NUMBER``) are catchable by the dependency-free regex fallback; contextual
+identifiers (``PERSON``, ``LOCATION``, ``DATE_TIME``) require the Presidio backend
+(``pip install 'fabric-phi-deid[nlp]'``). A run on the regex fallback will therefore miss the
+contextual half — which is exactly the honest signal the scorecard should surface.
 """
 
 from __future__ import annotations
@@ -41,9 +41,13 @@ def _note(*parts: object) -> tuple[str, tuple[GoldSpan, ...]]:
     return text, tuple(spans)
 
 
-# Six synthetic clinical-note snippets with labeled PHI spans. Deliberately balanced between
+# Seven synthetic clinical-note snippets with labeled PHI spans. Deliberately balanced between
 # regex-catchable (structured) and Presidio-only (contextual) identifiers so the measured recall
 # honestly reflects which backend is active.
+#
+# Formatting is pinned below: one labeled part per line keeps the note text readable next to its
+# entity label. Letting the formatter collapse these makes the corpus much harder to review.
+# fmt: off
 FREE_TEXT_PHI_NOTES: tuple[tuple[str, tuple[GoldSpan, ...]], ...] = (
     _note(
         "Patient ", ("PERSON", "John Alvarez"), " (DOB ", ("DATE_TIME", "03/14/1972"),
@@ -73,7 +77,15 @@ FREE_TEXT_PHI_NOTES: tuple[tuple[str, tuple[GoldSpan, ...]], ...] = (
         "Discharge ", ("DATE_TIME", "07/22/2025"), ". Contact next of kin at ",
         ("PHONE_NUMBER", "617-555-0199"), ". Seen in ", ("LOCATION", "Boston"), ".",
     ),
+    # MRN is HIPAA identifier #7 and Presidio ships no recognizer for it, so ner_text always
+    # applies its own regex. This note keeps that path measured rather than assumed.
+    _note(
+        "Triage note: ", ("PERSON", "Alexa Castillo"), ", ",
+        ("MEDICAL_RECORD_NUMBER", "MRN00000002"), ", chest pain. Confirmed by phone ",
+        ("PHONE_NUMBER", "212-555-0111"), ".",
+    ),
 )
+# fmt: on
 
 
 def gold_span_count() -> int:

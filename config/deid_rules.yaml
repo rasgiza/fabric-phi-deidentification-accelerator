@@ -138,6 +138,10 @@ profiles:
         LengthOfStay:          passthrough
         EncounterYear:         passthrough
         EncounterMonth:        suppress
+        # FREE TEXT: identifiers hide *inside* narrative, so column-level rules are not enough.
+        # redact_text runs NER (Presidio when installed, regex otherwise) and replaces each
+        # detected span with its entity label. Set replacement: token to keep linkage instead.
+        ReasonForVisitNote:    {strategy: redact_text, replacement: label, namespace: encounter_note}
 
       fact_risk_score:
         RiskScoreKey: passthrough
@@ -253,6 +257,9 @@ profiles:
         LengthOfStay:          passthrough
         EncounterYear:         passthrough
         EncounterMonth:        suppress
+        # Free text: token replacement keeps a stable pseudonym per identifier, so notes stay
+        # analytically linkable under Expert Determination without exposing the identifier.
+        ReasonForVisitNote:    {strategy: redact_text, replacement: token, namespace: encounter_note}
 
       fact_risk_score:
         RiskScoreKey: passthrough

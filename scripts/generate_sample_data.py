@@ -44,9 +44,15 @@ from __future__ import annotations
 import argparse
 import csv
 import random
+import sys
 from collections import Counter
 from datetime import date, timedelta
 from pathlib import Path
+
+# Free-text notes are built by the sibling script so both generators plant the same
+# identifier mix. Kept as a sys.path import because scripts/ is not an installed package.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from add_clinical_notes import build_note  # noqa: E402
 
 DEFAULT_DATA_DIR = Path(__file__).resolve().parent.parent / "sample_data" / "caboodle_provider"
 
@@ -93,8 +99,12 @@ ENCOUNTER_COLS = [
     "EncounterDate",
     "EncounterType",
     "LengthOfStay",
+    "ReasonForVisitNote",
 ]
 RISK_COLS = ["RiskScoreKey", "PatientKey", "ProviderKey", "RiskModel", "RiskScore", "ScoreDate"]
+
+# Fraction of generated encounters that carry a free-text note. Matches the committed data.
+NOTE_FILL_RATE = 0.2
 
 # Small synthetic name pools for new patients (deliberately generic, non-real).
 FIRST_NAMES = [
@@ -217,7 +227,8 @@ def _pool(rows: list[dict[str, str]], col: str) -> list[str]:
 
 def _append_rows(path: Path, cols: list[str], new_rows: list[list[str]]) -> None:
     with path.open("a", encoding="utf-8", newline="") as fh:
-        writer = csv.writer(fh)
+        # LF to match the committed CSVs; csv.writer would otherwise append CRLF rows.
+        writer = csv.writer(fh, lineterminator="\n")
         for row in new_rows:
             writer.writerow(row)
     print(f"  {path.name:32s} +{len(new_rows):,} rows")
@@ -263,6 +274,12 @@ def generate(  # noqa: PLR0913 - explicit knobs are clearer than a config object
     # --- patients (must run first so new fact rows can reference them) ---
     patient_keys = _int_keys(patients, "PatientKey")
     max_patient_key = max(patient_keys) if patient_keys else 0
+    # PatientKey -> (PatientName, MRN); used to write realistic free-text encounter notes.
+    patient_identity: dict[str, tuple[str, str]] = {
+        row["PatientKey"]: (row.get("PatientName", ""), row.get("MRN", ""))
+        for row in patients
+        if row.get("PatientKey")
+    }
     if add_patients > 0:
         new_patient_rows: list[list[str]] = []
         for i in range(1, add_patients + 1):
@@ -289,6 +306,7 @@ def generate(  # noqa: PLR0913 - explicit knobs are clearer than a config object
                     "9999-12-31",
                 ]
             )
+            patient_identity[str(pk)] = (f"{first} {last}", f"MRN{pk:08d}")
         _append_rows(data_dir / "DimPatient.csv", PATIENT_COLS, new_patient_rows)
         patient_keys.extend(range(max_patient_key + 1, max_patient_key + add_patients + 1))
 
@@ -340,10 +358,18 @@ def generate(  # noqa: PLR0913 - explicit knobs are clearer than a config object
             enc_type = rng.choice(type_pool)
             los = rng.randint(1, 14) if enc_type.lower() == "inpatient" else 0
             referring = rng.choice(provider_keys) if rng.random() > 0.4 else ""
+            patient_key = rng.choice(patient_keys)
+            # Only ~20% of encounters carry a note, matching the committed sample data.
+            # Blank notes are intentional: they prove the redaction path handles empty text.
+            note = ""
+            if rng.random() < NOTE_FILL_RATE:
+                name, mrn = patient_identity.get(str(patient_key), ("", ""))
+                if name:
+                    note = build_note(rng, name, mrn)
             new_enc_rows.append(
                 [
                     max_enc_key + i,
-                    rng.choice(patient_keys),
+                    patient_key,
                     rng.choice(provider_keys),
                     referring,
                     rng.choice(department_keys),
@@ -352,6 +378,7 @@ def generate(  # noqa: PLR0913 - explicit knobs are clearer than a config object
                     _rand_date(rng, svc_start, svc_end).isoformat(),
                     enc_type,
                     los,
+                    note,
                 ]
             )
         _append_rows(data_dir / "FactEncounter.csv", ENCOUNTER_COLS, new_enc_rows)
