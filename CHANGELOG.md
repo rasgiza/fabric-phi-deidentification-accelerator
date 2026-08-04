@@ -7,6 +7,33 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Clarity is now conformed into the Gold star** (`03b_gold_safe` and its Analytics twin),
+  closing the gap where Clarity was de-identified and governed but never reached Power BI:
+  - `gold_safe_dim_patient` becomes a **conformed dimension**. The two schemas are matched on
+    the shared `mrn` token namespace, so a patient in both systems is **one row** tagged
+    `SourceSystem = 'Both'` rather than two. A Clarity-only patient's `PatientKey` is minted
+    deterministically from that same token, so they keep their key if they later appear in
+    Caboodle — a random surrogate would have forked them into a second row.
+  - Clarity's orders, results, diagnoses and admissions land as `gold_safe_fact_clarity_*` at
+    **their own grain**, linked through the conformed `PatientKey`. They are deliberately not
+    unioned into `fact_encounter`: that would invent a grain neither source actually has.
+  - New `src/fabric_phi_deid/gold_conform.py` holds the star's column projections
+    declaratively and **Spark-free**, so the PHI-Raw and Analytics copies of `03b` cannot
+    drift apart and CI can test the model's shape on a laptop.
+  - New `tests/test_gold_conform.py` asserts every published column is explicitly ruled and
+    **not suppressed** (a suppressed column publishes as silent nulls, which looks like
+    missing data rather than a bug), that both MRN columns still share one token namespace,
+    and that every Clarity fact resolves through a consistently tokenized `PAT_ID`.
+  - The publish gate gained **conformed-key integrity checks**: it now fails closed on a
+    duplicate `PatientKey` (which would fan out every measure joined through the patient
+    dimension) and on any Clarity fact whose `PatientKey` failed to resolve (which would drop
+    out of every cohort filter while still inflating unfiltered totals). Row-count
+    reconciliation now compares against the count the build **declared** it intended to
+    publish, which is what allows `dim_patient` to legitimately union two sources.
+  - A partially de-identified Clarity source is now a hard failure in `03b` rather than a
+    silent half-build, mirroring `02b`.
+  - `gold_safe_dim_patient.SourceSystem` is surfaced in the semantic model so a report can
+    slice Caboodle vs Clarity vs Both.
 - **Second synthetic source schema: Epic Clarity** (`sample_data/Clarity/`, 24 normalized
   transactional CSVs) alongside the existing Caboodle dimensional set, proving that
   onboarding another EHR schema is a **config change, not a code change**:

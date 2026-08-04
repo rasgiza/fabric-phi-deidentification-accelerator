@@ -70,6 +70,15 @@ table gold_safe_dim_patient
 		summarizeBy: none
 		sourceColumn: PCPProviderKey
 
+	/// Which Epic-shaped source the patient came from: Caboodle, Clarity, or Both.
+	/// Patients present in both systems are ONE row, matched on the shared MRN token —
+	/// so slicing by this does not double-count.
+	column SourceSystem
+		dataType: string
+		lineageTag: 3f2b7c14-9a6e-4d51-b8c3-7e05a2f16d84
+		summarizeBy: none
+		sourceColumn: SourceSystem
+
 	partition gold_safe_dim_patient = entity
 		mode: directLake
 		source

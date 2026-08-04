@@ -15,6 +15,7 @@ Public API
                      enforce_k_anonymity
 - Free-text NER:     analyze_text, redact_text, scan_texts, NER_AVAILABLE
 - Eval harness:      ClassificationMetrics, evaluate_sets, evaluate_spans
+- Gold conformance:  gold_conform (declarative, Spark-free spec for the gold_safe_* star)
 """
 
 from __future__ import annotations

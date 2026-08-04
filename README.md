@@ -56,7 +56,7 @@ flowchart LR
     end
     subgraph ANALYTICS["ANALYTICS workspace (analysts, Copilot)"]
         D -->|cross-workspace| SD[silver_deid_*]
-        SD --> G[gold_safe_*<br/>PHI-free star]
+        SD --> G["gold_safe_*<br/>conformed PHI-free star<br/>Caboodle + Clarity, matched on MRN token"]
         G --> BI[Power BI + Copilot]
         SC{{NB_scorecard<br/>asserts 0/18 identifiers}}
     end
@@ -121,9 +121,22 @@ Two details worth calling out, because they are judgement calls a generic tool g
   profile parity and "Safe Harbor never emits a full date," so the rulebook cannot drift
   silently.
 
-Gold (`03b`) models the Caboodle star only; `silver_deid_clarity_*` is produced and governed
-but not projected into that star. Conforming it is a **modeling** exercise, not a privacy
-one — everything at that layer is already de-identified.
+Gold (`03b`) conforms **both** schemas into one star. `gold_safe_dim_patient` is a genuinely
+conformed dimension: the two sources are matched on the shared `mrn` token, so a patient in
+both systems is **one row** tagged `SourceSystem = 'Both'`, and a Clarity-only patient gets a
+`PatientKey` minted from that same token — so they keep their key if they later show up in
+Caboodle. Clarity's orders and results have no Caboodle equivalent, so they land as
+`gold_safe_fact_clarity_*` at their own grain and link back through the conformed
+`PatientKey`; forcing them into `fact_encounter` would invent a grain neither source has.
+
+The star's column projections live in
+[`gold_conform.py`](src/fabric_phi_deid/gold_conform.py), not in the notebooks — so the
+PHI-Raw and Analytics copies of `03b` cannot drift apart, and
+[`tests/test_gold_conform.py`](tests/test_gold_conform.py) asserts the whole shape against the
+rulebook **without a Spark session**: every published column is explicitly ruled, none is
+suppressed (a suppressed column would publish as silent nulls), and both MRN columns still
+share one token namespace. Loading only Caboodle is still supported — `03b` detects it and
+builds the Caboodle-only star.
 
 ## Free-text PHI and detector quality
 
