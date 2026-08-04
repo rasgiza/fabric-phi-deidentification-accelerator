@@ -1,7 +1,8 @@
 # Quickstart — 6 steps to a PHI-free Gold layer
 
 > ⚠️ **SYNTHETIC DATA ONLY.** This is a reference pattern demonstrated on synthetic
-> Epic-Caboodle data — **not** a certified de-identification service. Before any real PHI,
+> Epic-shaped data (Caboodle **and** Clarity) — **not** a certified de-identification
+> service. Before any real PHI,
 > work through [docs/pre_real_phi_checklist.md](docs/pre_real_phi_checklist.md).
 
 **What you'll build:** a Bronze → Silver → Gold medallion on Microsoft Fabric where the
@@ -52,11 +53,22 @@ separate workspace, not hidden. Create three workspaces and attach a Lakehouse t
 | **Vault** | ~2 approvers (break-glass) | `NB_reidentify` |
 
 ### 2. Load the sample data (Raw workspace)
-Upload the bundled folder [`sample_data/caboodle_provider/`](sample_data/caboodle_provider/)
-(13 synthetic Caboodle CSVs — no real PHI) into the **Raw** Lakehouse at
-`Files/raw/caboodle_provider/`.
+Upload both bundled folders into the **Raw** Lakehouse. They are synthetic — no real PHI —
+and each source is **independent**: load one or both and the pipeline adapts.
 
-Need more volume for load/variety testing? Append FK-safe synthetic rows:
+| Bundled folder | Upload to | Tables | Shape |
+|---|---|---|---|
+| [`sample_data/caboodle_provider/`](sample_data/caboodle_provider/) | `Files/raw/caboodle_provider/` | 13 | dimensional warehouse |
+| [`sample_data/Clarity/`](sample_data/Clarity/) | `Files/raw/clarity/` | 24 | normalized transactional |
+
+The destination paths are a **contract** with `01_bronze_ingest` — rename one and you get a
+silently empty ingest rather than an error.
+
+Two schemas, one engine: `02b_silver_deid` contains no table names and de-identifies
+whichever sources it finds. That is the portability claim — see
+[Two source schemas, one engine](README.md#two-source-schemas-one-engine).
+
+Need more volume for load/variety testing? Append FK-safe synthetic rows to the Caboodle set:
 ```powershell
 python scripts/generate_sample_data.py --add-claims 100000 --add-patients 5000 --seed 42
 ```

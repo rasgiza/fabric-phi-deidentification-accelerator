@@ -20,7 +20,7 @@ Arrange side-by-side (or 3 virtual desktops). The visible identity change **is**
 ## Pre-demo setup checklist (do the day before, verify 30 min before)
 
 **Data & code**
-- [ ] 13 synthetic Caboodle CSVs landed at `Files/raw/caboodle_provider/`
+- [ ] Synthetic CSVs landed: Caboodle (13) at `Files/raw/caboodle_provider/`, Clarity (24) at `Files/raw/clarity/`
 - [ ] Accelerator `src/` + `config/` uploaded to `Files/accelerator/`
 - [ ] Pepper stored in Key Vault as `phi-deid-pepper`; KV URL wired via `PHI_DEID_KEYVAULT_URL`
 

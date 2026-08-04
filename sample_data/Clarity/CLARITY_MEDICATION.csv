@@ -1,0 +1,21 @@
+MEDICATION_ID,NAME,GENERIC_NAME,THERA_CLASS,STRENGTH,FORM
+MED500001,Lisinopril 10 mg tablet,Lisinopril,Cardiovascular,tablet,Oral
+MED500002,Metformin 500 mg tablet,Metformin,Antidiabetic,tablet,Oral
+MED500003,Atorvastatin 20 mg tablet,Atorvastatin,Lipid Lowering,tablet,Oral
+MED500004,Amlodipine 5 mg tablet,Amlodipine,Cardiovascular,tablet,Oral
+MED500005,Omeprazole 20 mg capsule,Omeprazole,Gastrointestinal,capsule,Oral
+MED500006,Levothyroxine 50 mcg tablet,Levothyroxine,Endocrine,tablet,Oral
+MED500007,Albuterol HFA inhaler,Albuterol,Respiratory,inhaler,Inhalation
+MED500008,Amoxicillin 500 mg capsule,Amoxicillin,Anti-infective,capsule,Oral
+MED500009,Sertraline 50 mg tablet,Sertraline,Psychiatric,tablet,Oral
+MED500010,Ibuprofen 600 mg tablet,Ibuprofen,Analgesic,tablet,Oral
+MED500011,Gabapentin 300 mg capsule,Gabapentin,Neurologic,capsule,Oral
+MED500012,Hydrochlorothiazide 25 mg tablet,Hydrochlorothiazide,Cardiovascular,tablet,Oral
+MED500013,Metoprolol 50 mg tablet,Metoprolol,Cardiovascular,tablet,Oral
+MED500014,Prednisone 10 mg tablet,Prednisone,Anti-inflammatory,tablet,Oral
+MED500015,Insulin glargine 100 unit/mL,Insulin Glargine,Antidiabetic,unit/mL,Subcutaneous
+MED500016,Azithromycin 250 mg tablet,Azithromycin,Anti-infective,tablet,Oral
+MED500017,Furosemide 40 mg tablet,Furosemide,Cardiovascular,tablet,Oral
+MED500018,Warfarin 5 mg tablet,Warfarin,Hematologic,tablet,Oral
+MED500019,Tramadol 50 mg tablet,Tramadol,Analgesic,tablet,Oral
+MED500020,Escitalopram 10 mg tablet,Escitalopram,Psychiatric,tablet,Oral

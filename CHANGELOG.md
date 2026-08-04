@@ -7,6 +7,42 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **Second synthetic source schema: Epic Clarity** (`sample_data/Clarity/`, 24 normalized
+  transactional CSVs) alongside the existing Caboodle dimensional set, proving that
+  onboarding another EHR schema is a **config change, not a code change**:
+  - `config/deid_rules.yaml` gains 8 `clarity_*` table blocks in **both** profiles.
+    `PAT_MRN_ID` shares the `mrn` token namespace with Caboodle's `MRN`, so the same patient
+    resolves to the same token across schemas. `PAT_ENC_CSN_ID` is tokenized (a CSN is
+    printed on paperwork) while Caboodle's internal `EncounterKey` stays passthrough.
+  - `01_bronze_ingest` gains a `SOURCES` registry plus **header, parse, and primary-key
+    contract checks** — a renamed or reordered source column now fails the run instead of
+    silently routing a PHI value through the wrong rule.
+  - `02_silver_conform` derives `AGE`/`AGE_BAND` from shared helpers (so a cross-source
+    cohort cannot compare two different definitions of "65+"), broadcasts the patient key
+    set for referential-integrity filters, and discovers reference tables from the catalog.
+  - `02b_silver_deid` now contains **no table names**: it resolves whichever sources are
+    present and treats a *partially* loaded source as a hard failure.
+  - `PHI_Deid_Launcher.ipynb` uploads both datasets from a registry mirroring `01`'s.
+  - `tests/test_multi_source_rules.py`: profile parity, cross-schema token linkage,
+    "no direct identifier is passthrough", "Safe Harbor never emits a full date", and
+    "Expert Determination shifts dates by patient".
+
+### Changed
+- **`PHI_Deid_Launcher.ipynb` hardened for unattended runs.** Every Fabric REST call now
+  goes through a shared `requests.Session` with an explicit `(connect, read)` timeout and a
+  bounded retry policy. `requests` has **no default timeout**, so a stalled connection
+  previously hung the notebook — and its Spark session — indefinitely. Retries fire on
+  status only (`read=0`, `status_forcelist=(429, 502, 503, 504)`, honouring `Retry-After`):
+  those responses mean the request was throttled or never reached the service, so replaying
+  is safe, whereas a read timeout *after* a POST was accepted is deliberately **not**
+  retried — item creation is not idempotent and a blind replay would duplicate notebooks.
+
+### Fixed
+- **Launcher repo download no longer extracts an archive unchecked.** Members are validated
+  against the extraction root before `extractall` (zip-slip / path traversal), the archive is
+  unpacked into `tempfile.mkdtemp()` instead of a predictable `/tmp` path (symlink and
+  pre-creation attacks; also lets two runs coexist), and prerequisite checks raise
+  `RuntimeError` rather than `assert` — assertions vanish under `python -O`.
 - Bundled synthetic sample dataset under `sample_data/caboodle_provider/` — the 13 Caboodle
   provider CSVs (generated with Tonic Fabricate, no real PHI) so the Bronze→Silver→Gold
   pipeline runs immediately after clone.

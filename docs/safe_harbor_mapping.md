@@ -1,36 +1,51 @@
 # Safe Harbor Identifier Mapping
 
-> **SYNTHETIC DATA ONLY** (accelerator). Mapping is illustrative for the Caboodle provider
-> dataset. Validate completeness against your own schema with a qualified reviewer.
+> **SYNTHETIC DATA ONLY** (accelerator). Mapping is illustrative for the two bundled
+> synthetic source schemas. Validate completeness against your own schema with a qualified
+> reviewer.
 
 HIPAA **Safe Harbor** (45 CFR §164.514(b)(2)) requires removing or generalizing **18**
-identifier types. Below: each identifier, whether it appears in this dataset, and the
+identifier types. Below: each identifier, where it appears in each bundled source, and the
 strategy the engine applies (see [`config/deid_rules.yaml`](../config/deid_rules.yaml)).
 
-| # | Safe Harbor identifier | In this dataset? | Column(s) | Strategy |
-|---|------------------------|------------------|-----------|----------|
-| 1 | Names | Yes | `FirstName`, `LastName`, `PatientName`, provider names | `synthesize` |
-| 2 | Geographic subdivisions < state | Yes | patient `ZIP` | `generalize(zip3)`; `000` for low-pop |
-| 3 | Dates (except year) related to an individual | Yes | `DateOfBirth`, `ServiceDate`, `EncounterDate`, `ScoreDate`, `*Month` | `generalize(year)` / `date_shift`; month suppressed |
-| 4 | Telephone numbers | No | — | (scorecard scans for phone patterns) |
-| 5 | Fax numbers | No | — | — |
-| 6 | Email addresses | No | — | (scorecard scans for email patterns) |
-| 7 | Social Security numbers | No | — | (scorecard scans for SSN patterns) |
-| 8 | Medical record numbers | Yes | `MRN` | `tokenize` (HMAC, `PT-`) |
-| 9 | Health plan beneficiary numbers | No (payer is org-level) | — | — |
-| 10 | Account numbers | No | — | — |
-| 11 | Certificate / license numbers | Yes | `LicenseNumber`, `DEANumber` | `tokenize` |
-| 12 | Vehicle identifiers | No | — | — |
-| 13 | Device identifiers / serial numbers | No | — | — |
-| 14 | Web URLs | No | — | — |
-| 15 | IP addresses | No | — | — |
-| 16 | Biometric identifiers | No | — | — |
-| 17 | Full-face photos / comparable images | No | — | — |
-| 18 | Any other unique identifying number/characteristic/code | Provider `NPI` | `NPI` | `tokenize` (optional; on by default) |
-| — | Ages > 89 must be aggregated | Yes | `Age` | `generalize(age_cap=90)` |
+The two sources are deliberately different shapes — **Caboodle** (dimensional warehouse)
+and **Clarity** (normalized transactional). The same engine handles both; only the column
+names differ, which is exactly the point.
+
+| # | Safe Harbor identifier | Caboodle column(s) | Clarity column(s) | Strategy |
+|---|------------------------|--------------------|-------------------|----------|
+| 1 | Names | `FirstName`, `LastName`, `PatientName`, provider names | `PAT_NAME`, `PAT_FIRST_NAME`, `PAT_LAST_NAME`, `PROV_NAME` | `synthesize` |
+| 2 | Geographic subdivisions < state | patient `ZIP` | `ZIP`, `CITY`, `ADD_LINE_1` | `generalize(zip3)` (`000` for low-pop); city/street `suppress` |
+| 3 | Dates (except year) related to an individual | `DateOfBirth`, `ServiceDate`, `EncounterDate`, `ScoreDate`, `*Month` | `BIRTH_DATE`, `DEATH_DATE`, `PAT_ENC_DATE`, `CONTACT_DATE`, `HOSP_ADMSN_TIME`, `HOSP_DISCH_TIME`, `ORDERING_DATE`, `START_DATE`, `END_DATE`, `PROC_START_TIME`, `RESULT_DATE`, `ENC_MONTH` | `generalize(year)` (Safe Harbor) / `date_shift` by `PAT_ID` (Expert Determination); month suppressed |
+| 4 | Telephone numbers | — | `HOME_PHONE` | `suppress` |
+| 5 | Fax numbers | — | — | — |
+| 6 | Email addresses | — | `EMAIL_ADDRESS` | `suppress` |
+| 7 | Social Security numbers | — | — | (scorecard scans for SSN patterns) |
+| 8 | Medical record numbers | `MRN` | `PAT_MRN_ID` | `tokenize` (HMAC, `PT-`) — **shared namespace**, so the same patient yields the same token in both schemas |
+| 9 | Health plan beneficiary numbers | (payer is org-level) | — | — |
+| 10 | Account numbers | — | — | — |
+| 11 | Certificate / license numbers | `LicenseNumber`, `DEANumber` | — | `tokenize` |
+| 12 | Vehicle identifiers | — | — | — |
+| 13 | Device identifiers / serial numbers | — | — | — |
+| 14 | Web URLs | — | — | — |
+| 15 | IP addresses | — | — | — |
+| 16 | Biometric identifiers | — | — | — |
+| 17 | Full-face photos / comparable images | — | — | — |
+| 18 | Any other unique identifying number/characteristic/code | `NPI` | `NPI`, `PAT_ID`, `PAT_ENC_CSN_ID` | `tokenize` (`NP-` / `EP-` / `ENC-`) |
+| — | Ages > 89 must be aggregated | `Age` | `AGE` | `generalize(age_cap=90)` |
 
 ## Notes on judgment calls
 
+- **`PAT_ENC_CSN_ID` is tokenized; Caboodle's `EncounterKey` is not.** Both are "the
+  encounter identifier," but a CSN is printed on discharge paperwork and displayed in the
+  Epic UI, which makes it a real-world identifier under #18. A warehouse surrogate key that
+  never leaves the database is not. Identical concept, different disclosure risk — this is
+  the kind of call a generic scanning tool gets wrong in both directions.
+- **`PAT_ID` is tokenized even though it looks like a surrogate.** In Clarity it is *the*
+  patient key across seven tables and is exposed in downstream Epic tooling, so it is
+  treated as an identifier rather than an internal artifact.
+- **`STATE_C_NAME` is passed through.** Safe Harbor removes geography *smaller than* a
+  state; the state itself is permitted.
 - **Facility ZIP is kept.** Identifier #2 concerns the *individual's* geography. The facility
   (covered-entity) address ZIP in `dim_facility` is organizational, not patient geography, so
   it is retained; the facility **street address** (`AddressLine1`) is suppressed.

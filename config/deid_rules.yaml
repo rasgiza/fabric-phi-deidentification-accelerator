@@ -1,7 +1,11 @@
 # =====================================================================================
 # deid_rules.yaml — the rulebook that drives the de-identification engine.
 #
-# SYNTHETIC DATA ONLY. Tuned for the synthetic Epic-Caboodle provider dataset (13 tables).
+# SYNTHETIC DATA ONLY. Covers TWO synthetic Epic source schemas:
+#   * Caboodle (dimensional warehouse) -- 13 tables, keys `dim_*` / `fact_*` / `bridge_*`
+#   * Clarity  (normalized transactional) -- 24 tables, keys `clarity_*`
+# Both are de-identified by the SAME engine. Supporting a second EHR schema is a CONFIG
+# change, not a code change -- that is the portability claim this file exists to prove.
 # Validate against your own data + a qualified reviewer before any use on real PHI.
 #
 # How it works
@@ -151,6 +155,124 @@ profiles:
         RiskScore:    passthrough
         ScoreDate:    {strategy: generalize, kind: year}
 
+      # ===================================================================================
+      # EPIC CLARITY — the normalized, transactional source most Epic shops land first.
+      # Same engine, same strategies; only names differ. Two things make Clarity a harder
+      # (and therefore better) test than Caboodle:
+      #   1. PAT_ID is a REAL identifier, not a surrogate key, and it is the join column in
+      #      seven tables -> tokenizing it consistently is what keeps the source joinable.
+      #   2. PAT_ENC_CSN_ID (contact serial number) is visible on paperwork and in the UI,
+      #      so it is treated as identifier #18 and tokenized -- unlike Caboodle's purely
+      #      internal EncounterKey, which is passed through.
+      # ===================================================================================
+
+      # ---- PATIENT: Clarity's primary PHI table -------------------------------------
+      clarity_patient:
+        PAT_ID:            {strategy: tokenize, namespace: pat_id, prefix: "EP-"}
+        PAT_MRN_ID:        {strategy: tokenize, namespace: mrn, prefix: "PT-"}
+        PAT_NAME:          {strategy: synthesize, kind: name}
+        PAT_FIRST_NAME:    {strategy: synthesize, kind: first_name}
+        PAT_LAST_NAME:     {strategy: synthesize, kind: last_name}
+        BIRTH_DATE:        {strategy: generalize, kind: year}
+        SEX_C:             passthrough              # ZC_SEX code, not identifying
+        MARITAL_STATUS_C:  passthrough
+        PAT_STATUS_C:      passthrough
+        DEATH_DATE:        {strategy: generalize, kind: year}   # date of death -> year
+        CITY:              suppress                 # geography finer than state
+        STATE_C_NAME:      passthrough              # state IS permitted under Safe Harbor
+        ZIP:               {strategy: generalize, kind: zip3}
+        HOME_PHONE:        suppress                 # identifier #4
+        EMAIL_ADDRESS:     suppress                 # identifier #6
+        ADD_LINE_1:        suppress                 # street address
+        AGE:               {strategy: generalize, kind: age_cap, cap: 90}   # derived in silver
+        AGE_BAND:          passthrough              # already generalized in silver
+
+      # ---- PAT_ENC: one row per patient contact --------------------------------------
+      clarity_pat_enc:
+        PAT_ENC_CSN_ID:  {strategy: tokenize, namespace: csn, prefix: "ENC-"}
+        PAT_ID:          {strategy: tokenize, namespace: pat_id, prefix: "EP-"}
+        PAT_ENC_DATE:    {strategy: generalize, kind: year}
+        CONTACT_DATE:    {strategy: generalize, kind: year}
+        ENC_TYPE_C:      passthrough
+        APPT_STATUS_C:   passthrough
+        DEPARTMENT_ID:   passthrough
+        VISIT_PROV_ID:   passthrough               # provider, not patient
+        ENC_CLOSED_YN:   passthrough
+        ENC_YEAR:        passthrough               # derived in silver, already year-grain
+        ENC_MONTH:       suppress                  # yyyy-MM too granular for Safe Harbor
+
+      # ---- PAT_ENC_HSP: inpatient admit/discharge -------------------------------------
+      clarity_pat_enc_hsp:
+        PAT_ENC_CSN_ID:    {strategy: tokenize, namespace: csn, prefix: "ENC-"}
+        PAT_ID:            {strategy: tokenize, namespace: pat_id, prefix: "EP-"}
+        ADT_PAT_CLASS:     passthrough
+        HOSP_ADMSN_TIME:   {strategy: generalize, kind: year}   # admission date -> year
+        HOSP_DISCH_TIME:   {strategy: generalize, kind: year}   # discharge date -> year
+        ADMIT_SOURCE_C:    passthrough
+        DISCH_DISP_C:      passthrough
+        DEPARTMENT_ID:     passthrough
+        ADMISSION_PROV_ID: passthrough
+        LOS_DAYS:          passthrough              # interval, not a calendar date
+
+      # ---- PAT_ENC_DX: encounter diagnoses --------------------------------------------
+      clarity_pat_enc_dx:
+        PAT_ENC_CSN_ID: {strategy: tokenize, namespace: csn, prefix: "ENC-"}
+        PAT_ID:         {strategy: tokenize, namespace: pat_id, prefix: "EP-"}
+        LINE:           passthrough
+        CONTACT_DATE:   {strategy: generalize, kind: year}
+        DX_ID:          passthrough
+        PRIMARY_DX_YN:  passthrough
+        DX_ED_YN_C:     passthrough
+
+      # ---- ORDER_MED / ORDER_PROC / ORDER_RESULTS: order + result grain ---------------
+      clarity_order_med:
+        ORDER_MED_ID:      passthrough              # assigned to the ORDER, not the person
+        PAT_ID:            {strategy: tokenize, namespace: pat_id, prefix: "EP-"}
+        PAT_ENC_CSN_ID:    {strategy: tokenize, namespace: csn, prefix: "ENC-"}
+        MEDICATION_ID:     passthrough
+        AUTHRZING_PROV_ID: passthrough
+        ORDERING_DATE:     {strategy: generalize, kind: year}
+        START_DATE:        {strategy: generalize, kind: year}
+        END_DATE:          {strategy: generalize, kind: year}
+        ORDER_STATUS_C:    passthrough
+        QUANTITY:          passthrough
+        HV_DISCRETE_DOSE:  passthrough
+
+      clarity_order_proc:
+        ORDER_PROC_ID:     passthrough
+        PAT_ID:            {strategy: tokenize, namespace: pat_id, prefix: "EP-"}
+        PAT_ENC_CSN_ID:    {strategy: tokenize, namespace: csn, prefix: "ENC-"}
+        PROC_ID:           passthrough
+        AUTHRZING_PROV_ID: passthrough
+        ORDERING_DATE:     {strategy: generalize, kind: year}
+        PROC_START_TIME:   {strategy: generalize, kind: year}   # timestamp -> year
+        ORDER_STATUS_C:    passthrough
+        QUANTITY:          passthrough
+        ORDER_TYPE:        passthrough
+
+      clarity_order_results:
+        ORDER_PROC_ID:   passthrough
+        LINE:            passthrough
+        PAT_ID:          {strategy: tokenize, namespace: pat_id, prefix: "EP-"}
+        PAT_ENC_CSN_ID:  {strategy: tokenize, namespace: csn, prefix: "ENC-"}
+        COMPONENT_ID:    passthrough
+        RESULT_DATE:     {strategy: generalize, kind: year}
+        ORD_VALUE:       passthrough               # the lab value itself is not an identifier
+        ORD_NUM_VALUE:   passthrough
+        REFERENCE_UNIT:  passthrough
+        REFERENCE_LOW:   passthrough
+        REFERENCE_HIGH:  passthrough
+        RESULT_FLAG_C:   passthrough
+
+      # ---- CLARITY_SER: providers (NPI + name identify the clinician) -----------------
+      clarity_ser:
+        PROV_ID:       passthrough
+        PROV_NAME:     {strategy: synthesize, kind: name}
+        PROV_TYPE_C:   passthrough
+        SPECIALTY:     passthrough
+        NPI:           {strategy: tokenize, namespace: npi, prefix: "NP-"}
+        ACTIVE_STATUS: passthrough
+
   # -----------------------------------------------------------------------------------
   # EXPERT DETERMINATION (§164.514(b)(1)): retain analytic utility. Care dates are
   # SHIFTED per-patient (intervals preserved) instead of collapsed to year. Requires a
@@ -268,3 +390,112 @@ profiles:
         RiskModel:    passthrough
         RiskScore:    passthrough
         ScoreDate:    {strategy: date_shift, entity_column: PatientKey, max_days: 365}
+
+      # ===================================================================================
+      # EPIC CLARITY under Expert Determination. Identical column classification to Safe
+      # Harbor; the ONLY difference is that care dates are SHIFTED per patient instead of
+      # collapsed to year. entity_column is PAT_ID (Clarity's real patient key), so every
+      # date for a given patient moves by the same offset across all seven tables and
+      # intervals -- length of stay, time-to-result, med duration -- stay intact.
+      # ===================================================================================
+
+      clarity_patient:
+        PAT_ID:            {strategy: tokenize, namespace: pat_id, prefix: "EP-"}
+        PAT_MRN_ID:        {strategy: tokenize, namespace: mrn, prefix: "PT-"}
+        PAT_NAME:          {strategy: synthesize, kind: name}
+        PAT_FIRST_NAME:    {strategy: synthesize, kind: first_name}
+        PAT_LAST_NAME:     {strategy: synthesize, kind: last_name}
+        BIRTH_DATE:        {strategy: date_shift, entity_column: PAT_ID, max_days: 365}
+        SEX_C:             passthrough
+        MARITAL_STATUS_C:  passthrough
+        PAT_STATUS_C:      passthrough
+        DEATH_DATE:        {strategy: date_shift, entity_column: PAT_ID, max_days: 365}
+        CITY:              suppress
+        STATE_C_NAME:      passthrough
+        ZIP:               {strategy: generalize, kind: zip3}
+        HOME_PHONE:        suppress
+        EMAIL_ADDRESS:     suppress
+        ADD_LINE_1:        suppress
+        AGE:               {strategy: generalize, kind: age_cap, cap: 90}
+        AGE_BAND:          passthrough
+
+      clarity_pat_enc:
+        PAT_ENC_CSN_ID:  {strategy: tokenize, namespace: csn, prefix: "ENC-"}
+        PAT_ID:          {strategy: tokenize, namespace: pat_id, prefix: "EP-"}
+        PAT_ENC_DATE:    {strategy: date_shift, entity_column: PAT_ID, max_days: 365}
+        CONTACT_DATE:    {strategy: date_shift, entity_column: PAT_ID, max_days: 365}
+        ENC_TYPE_C:      passthrough
+        APPT_STATUS_C:   passthrough
+        DEPARTMENT_ID:   passthrough
+        VISIT_PROV_ID:   passthrough
+        ENC_CLOSED_YN:   passthrough
+        ENC_YEAR:        passthrough
+        ENC_MONTH:       suppress
+
+      clarity_pat_enc_hsp:
+        PAT_ENC_CSN_ID:    {strategy: tokenize, namespace: csn, prefix: "ENC-"}
+        PAT_ID:            {strategy: tokenize, namespace: pat_id, prefix: "EP-"}
+        ADT_PAT_CLASS:     passthrough
+        HOSP_ADMSN_TIME:   {strategy: date_shift, entity_column: PAT_ID, max_days: 365}
+        HOSP_DISCH_TIME:   {strategy: date_shift, entity_column: PAT_ID, max_days: 365}
+        ADMIT_SOURCE_C:    passthrough
+        DISCH_DISP_C:      passthrough
+        DEPARTMENT_ID:     passthrough
+        ADMISSION_PROV_ID: passthrough
+        LOS_DAYS:          passthrough
+
+      clarity_pat_enc_dx:
+        PAT_ENC_CSN_ID: {strategy: tokenize, namespace: csn, prefix: "ENC-"}
+        PAT_ID:         {strategy: tokenize, namespace: pat_id, prefix: "EP-"}
+        LINE:           passthrough
+        CONTACT_DATE:   {strategy: date_shift, entity_column: PAT_ID, max_days: 365}
+        DX_ID:          passthrough
+        PRIMARY_DX_YN:  passthrough
+        DX_ED_YN_C:     passthrough
+
+      clarity_order_med:
+        ORDER_MED_ID:      passthrough
+        PAT_ID:            {strategy: tokenize, namespace: pat_id, prefix: "EP-"}
+        PAT_ENC_CSN_ID:    {strategy: tokenize, namespace: csn, prefix: "ENC-"}
+        MEDICATION_ID:     passthrough
+        AUTHRZING_PROV_ID: passthrough
+        ORDERING_DATE:     {strategy: date_shift, entity_column: PAT_ID, max_days: 365}
+        START_DATE:        {strategy: date_shift, entity_column: PAT_ID, max_days: 365}
+        END_DATE:          {strategy: date_shift, entity_column: PAT_ID, max_days: 365}
+        ORDER_STATUS_C:    passthrough
+        QUANTITY:          passthrough
+        HV_DISCRETE_DOSE:  passthrough
+
+      clarity_order_proc:
+        ORDER_PROC_ID:     passthrough
+        PAT_ID:            {strategy: tokenize, namespace: pat_id, prefix: "EP-"}
+        PAT_ENC_CSN_ID:    {strategy: tokenize, namespace: csn, prefix: "ENC-"}
+        PROC_ID:           passthrough
+        AUTHRZING_PROV_ID: passthrough
+        ORDERING_DATE:     {strategy: date_shift, entity_column: PAT_ID, max_days: 365}
+        PROC_START_TIME:   {strategy: date_shift, entity_column: PAT_ID, max_days: 365}
+        ORDER_STATUS_C:    passthrough
+        QUANTITY:          passthrough
+        ORDER_TYPE:        passthrough
+
+      clarity_order_results:
+        ORDER_PROC_ID:   passthrough
+        LINE:            passthrough
+        PAT_ID:          {strategy: tokenize, namespace: pat_id, prefix: "EP-"}
+        PAT_ENC_CSN_ID:  {strategy: tokenize, namespace: csn, prefix: "ENC-"}
+        COMPONENT_ID:    passthrough
+        RESULT_DATE:     {strategy: date_shift, entity_column: PAT_ID, max_days: 365}
+        ORD_VALUE:       passthrough
+        ORD_NUM_VALUE:   passthrough
+        REFERENCE_UNIT:  passthrough
+        REFERENCE_LOW:   passthrough
+        REFERENCE_HIGH:  passthrough
+        RESULT_FLAG_C:   passthrough
+
+      clarity_ser:
+        PROV_ID:       passthrough
+        PROV_NAME:     {strategy: synthesize, kind: name}
+        PROV_TYPE_C:   passthrough
+        SPECIALTY:     passthrough
+        NPI:           {strategy: tokenize, namespace: npi, prefix: "NP-"}
+        ACTIVE_STATUS: passthrough

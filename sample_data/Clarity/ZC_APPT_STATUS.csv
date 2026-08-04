@@ -1,0 +1,6 @@
+APPT_STATUS_C,NAME
+1,Scheduled
+2,Completed
+3,Canceled
+4,No Show
+5,Arrived

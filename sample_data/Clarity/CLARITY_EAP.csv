@@ -1,0 +1,27 @@
+PROC_ID,PROC_NAME,PROC_CODE,PROC_CAT_NAME
+EAP600001,"Office/outpatient visit, established patient, low complexity",99213,E&M
+EAP600002,"Office/outpatient visit, established patient, moderate complexity",99214,E&M
+EAP600003,"Office/outpatient visit, new patient",99203,E&M
+EAP600004,"Emergency department visit, moderate severity",99284,E&M
+EAP600005,Complete blood count (CBC) with differential,85025,Laboratory
+EAP600006,Comprehensive metabolic panel,80053,Laboratory
+EAP600007,Lipid panel,80061,Laboratory
+EAP600008,Hemoglobin A1c,83036,Laboratory
+EAP600009,"Electrocardiogram, routine ECG with interpretation",93000,Cardiovascular
+EAP600010,"Chest X-ray, 2 views",71046,Radiology
+EAP600011,"CT scan, head/brain, without contrast",70450,Radiology
+EAP600012,"MRI, lumbar spine, without contrast",72148,Radiology
+EAP600013,"Colonoscopy, diagnostic",45378,Procedure
+EAP600014,"Vaccine administration, influenza",90686,Immunization
+EAP600015,"Knee arthroscopy, surgical",29881,Surgery
+EAP600016,Appendectomy,44970,Surgery
+EAP600017,Cesarean delivery,59510,Obstetric
+EAP600018,"Wound repair, simple",12001,Procedure
+EAP600019,"Echocardiogram, transthoracic",93306,Cardiovascular
+EAP600020,"Urinalysis, automated with microscopy",81001,Laboratory
+EAP900001,Complete Blood Count (CBC),85025,Lab
+EAP900002,Basic Metabolic Panel (BMP),80048,Lab
+EAP900003,Comprehensive Metabolic Panel (CMP),80053,Lab
+EAP900004,Lipid Panel,80061,Lab
+EAP900005,Hemoglobin A1c,83036,Lab
+EAP900006,Thyroid Stimulating Hormone (TSH),84443,Lab

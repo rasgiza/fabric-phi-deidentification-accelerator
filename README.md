@@ -7,8 +7,9 @@
 ![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)
 
 > ⚠️ **SYNTHETIC DATA ONLY.** This accelerator is a **reference / blueprint pattern**
-> designed and demonstrated on **synthetic** Epic-Caboodle data (generated with Tonic
-> Fabricate). It is **NOT a certified de-identification service.** Productionizing on
+> designed and demonstrated on **synthetic** Epic-shaped data — both a **Caboodle**
+> dimensional warehouse and a **Clarity** normalized transactional schema. It is
+> **NOT a certified de-identification service.** Productionizing on
 > real PHI requires your own Safe Harbor / Expert Determination validation, a signed
 > Business Associate Agreement (BAA), and a security review. See
 > [docs/positioning_and_scope.md](docs/positioning_and_scope.md).
@@ -30,6 +31,7 @@ Copilot point at contains **no PHI by construction**.
 
 - [What you'll build](#what-youll-build)
   - [Auditing and evidence](#auditing-and-evidence)
+- [Two source schemas, one engine](#two-source-schemas-one-engine)
 - [Free-text PHI and detector quality](#free-text-phi-and-detector-quality)
 - [Prerequisites](#prerequisites)
 - [Why this exists](#why-this-exists)
@@ -47,7 +49,7 @@ Copilot point at contains **no PHI by construction**.
 
 ```mermaid
 flowchart LR
-    CSV[13 synthetic<br/>Caboodle CSVs] --> B[bronze_*]
+    CSV["37 synthetic CSVs<br/>Caboodle (13) + Clarity (24)"] --> B[bronze_*]
     subgraph RAW["RAW workspace (~3 engineers)"]
         B --> S[silver_*]
         S --> D[02b_silver_deid<br/>de-identify + tokenize]
@@ -85,6 +87,43 @@ Every run is auditable — the accelerator does not just transform data, it **pr
   `scorecard_<id>.json` to `Files/audit/` (thresholds, checks, verdicts, determination —
   **no data values**), plus a per-run manifest and config fingerprint from
   [`audit.py`](src/fabric_phi_deid/audit.py). These are safe to keep as a compliance trail.
+
+## Two source schemas, one engine
+
+The usual objection to a de-identification demo is "that only works because it was built
+for *your* tables." So the accelerator ships **two** synthetic Epic-shaped sources with
+deliberately different shapes, and de-identifies both with the **same engine and the same
+notebook**:
+
+| | **Caboodle** | **Clarity** |
+|---|---|---|
+| Shape | Dimensional warehouse | Normalized transactional |
+| Tables | 13 (`dim_*`, `fact_*`, `bridge_*`) | 24 (`clarity_*`, incl. 10 `ZC_*` code tables) |
+| Grain | Conformed, one row per entity | Raw operational rows |
+| Patient key | `PatientKey` surrogate + `MRN` | `PAT_ID` + `PAT_MRN_ID` |
+| Bronze prefix | `bronze_` | `bronze_clarity_` |
+
+**What actually changed to add the second schema:** a table→schema entry in
+`01_bronze_ingest`'s `SOURCES` registry and a block of column rules in
+[`config/deid_rules.yaml`](config/deid_rules.yaml). `02b_silver_deid` contains **no table
+names at all** — it resolves whichever sources are present and applies the rulebook.
+Onboarding a third EHR is a **config change, not a code change**.
+
+Two details worth calling out, because they are judgement calls a generic tool gets wrong:
+
+- **`PAT_ENC_CSN_ID` is tokenized, but Caboodle's `EncounterKey` is not.** A CSN is printed
+  on discharge paperwork and shown in the UI, so it is a real-world identifier. A warehouse
+  surrogate key that never leaves the database is not. Same concept, different risk.
+- **MRN shares one token namespace across both schemas**, so a patient present in both
+  systems resolves to the same `PT-…` token and reconciles downstream — the reason to use
+  keyed HMAC tokens instead of random surrogates.
+  [`tests/test_multi_source_rules.py`](tests/test_multi_source_rules.py) asserts this, plus
+  profile parity and "Safe Harbor never emits a full date," so the rulebook cannot drift
+  silently.
+
+Gold (`03b`) models the Caboodle star only; `silver_deid_clarity_*` is produced and governed
+but not projected into that star. Conforming it is a **modeling** exercise, not a privacy
+one — everything at that layer is already de-identified.
 
 ## Free-text PHI and detector quality
 
@@ -200,7 +239,7 @@ fabric-phi-deid-accelerator/
     eval_harness.py             ← detector quality: precision / recall / F1 (value + span level)
     eval_fixtures.py            ← shipped synthetic labeled corpus (measures free-text recall)
   notebooks/
-    01_bronze_ingest.ipynb      ← foundation: 13 CSVs → typed bronze_* Delta
+    01_bronze_ingest.ipynb      ← foundation: 37 CSVs (2 source schemas) → typed bronze_* Delta
     02_silver_conform.ipynb     ← foundation: current rows, derived cols, referential integrity
     02b_silver_deid.ipynb       ← de-identify + tokenize → silver_deid_*
     03_gold_star.ipynb          ← foundation: star schema (the "before" — PHI reaches Gold)
@@ -278,11 +317,18 @@ output *cross-workspace*, so exactly one physical, PHI-free copy lands in Analyt
 
 1. Create the **three workspaces** (Raw, Analytics, Vault) and grant each the minimal audience
    above. Attach a Lakehouse in each.
-2. Land the 13 synthetic Caboodle CSVs at `Files/raw/caboodle_provider/` in the **Raw** workspace.
-   They are **bundled in this repo** under
-   [`sample_data/caboodle_provider/`](sample_data/caboodle_provider/) (synthetic, generated with
-   Tonic Fabricate — no real PHI) so you can run the pipeline immediately; just upload that folder
-   to the Raw Lakehouse. Need more volume for load/variety? Append FK-safe synthetic rows with
+2. Land the synthetic source CSVs in the **Raw** workspace's Lakehouse. Both datasets are
+   **bundled in this repo** (synthetic — no real PHI), and each is independent: upload one
+   or both and the pipeline adapts.
+
+   | Bundled folder | Upload to | Tables |
+   |---|---|---|
+   | [`sample_data/caboodle_provider/`](sample_data/caboodle_provider/) | `Files/raw/caboodle_provider/` | 13 |
+   | [`sample_data/Clarity/`](sample_data/Clarity/) | `Files/raw/clarity/` | 24 |
+
+   The destination folder names are a **contract** with `01_bronze_ingest` — rename one and
+   you get a silently empty ingest, not an error. Need more volume for load/variety? Append
+   FK-safe synthetic rows to the Caboodle set with
    [`scripts/generate_sample_data.py`](scripts/generate_sample_data.py), e.g.
    `python scripts/generate_sample_data.py --add-claims 100000 --add-patients 5000 --seed 42`.
 3. Import each notebook into its workspace per the table above (Data Engineering → Import) and

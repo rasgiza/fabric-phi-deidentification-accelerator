@@ -1,0 +1,81 @@
+PROV_ID,PROV_NAME,PROV_TYPE_C,SPECIALTY,NPI,ACTIVE_STATUS
+SER200001,"Kathryn Daniels, MD",1,Pediatrics,1048994177,Active
+SER200002,"Piper Simmons, MD",1,General Surgery,1635572088,Active
+SER200003,"Ivy Alvarez, MD",1,Anesthesiology,1843745132,Active
+SER200004,"Charles Zimmerman, NP",2,Psychiatry,1711729473,Active
+SER200005,"Ashton Herrera, MD",4,Radiology,1504151712,Active
+SER200006,"Frances Hamilton, PA",3,General Surgery,1468802433,Active
+SER200007,"Owen Goodwin, MD",1,Family Medicine,1420174167,Active
+SER200008,"Amy Murray, MD",1,Family Medicine,1527598042,Active
+SER200009,"Austin Salazar, MD",1,Cardiology,1609827257,Active
+SER200010,"Gianna Morrison, NP",2,Orthopedics,1111256336,Active
+SER200011,"Ryker Turner, MD",1,General Surgery,1304798909,Active
+SER200012,"Courtney Bishop, MD",4,Oncology,1527040961,Active
+SER200013,"Jill Bryant, MD",1,Oncology,1364910015,Active
+SER200014,"Maddox Peters, MD",1,Dermatology,1542926310,Active
+SER200015,"Christina Vasquez, MD",1,Psychiatry,1646595103,Active
+SER200016,"Sofia Lee, MD",4,Psychiatry,1873027636,Active
+SER200017,"Cassie Chapman, MD",1,Endocrinology,1525516347,Active
+SER200018,"Zoe Delgado, MD",1,Psychiatry,1786504176,Active
+SER200019,"Carson Jenkins, MD",1,Emergency Medicine,1249748543,Active
+SER200020,"Steven Parker, MD",4,Dermatology,1425550047,Active
+SER200021,"Gloria Sandoval, MD",1,Emergency Medicine,1863240533,Active
+SER200022,"Cassandra Cook, MD",1,Internal Medicine,1678816091,Active
+SER200023,"Luke Santos, MD",1,General Surgery,1090890221,Active
+SER200024,"Christopher Gonzales, PA",3,General Surgery,1575064462,Active
+SER200025,"Nina West, MD",1,Obstetrics & Gynecology,1558842513,Active
+SER200026,"Rhonda Aguilar, MD",1,Endocrinology,1292789507,Active
+SER200027,"Wendy Russell, MD",1,General Surgery,1120776636,Active
+SER200028,"Hugo Mitchell, MD",1,Anesthesiology,1297411862,Active
+SER200029,"Hannah Mills, PA",3,Dermatology,1018863540,Active
+SER200030,"Carl Brooks, MD",1,Family Medicine,1218037319,Active
+SER200031,"Ronald Henderson, MD",1,Psychiatry,1369732604,Active
+SER200032,"Tyler Schmidt, MD",4,Emergency Medicine,1783707079,Active
+SER200033,"Robert Taylor, MD",1,Family Medicine,1566114655,Active
+SER200034,"Lincoln Meyer, MD",1,Anesthesiology,1781857707,Active
+SER200035,"Jenna Figueroa, MD",4,Emergency Medicine,1804436296,Active
+SER200036,"Roman Duncan, PA",3,Oncology,1411060266,Active
+SER200037,"Addison Hernandez, PA",3,Neurology,1535107814,Active
+SER200038,"Elliott Crawford, NP",2,Endocrinology,1643978301,Active
+SER200039,"Micah Wheeler, MD",1,Internal Medicine,1538325382,Active
+SER200040,"Billy Ruiz, MD",1,Psychiatry,1639980424,Active
+SER200041,"Vanessa Hawkins, MD",1,Neurology,1649938979,Active
+SER200042,"Raymond Matthews, MD",1,Internal Medicine,1460663398,Active
+SER200043,"Ryder Kelly, MD",1,Orthopedics,1341610607,Active
+SER200044,"Brody Reynolds, PA",3,Emergency Medicine,1847631548,Active
+SER200045,"Quinn Cooper, MD",1,Dermatology,1399044855,Active
+SER200046,"Dorothy Dunn, MD",1,Internal Medicine,1349517751,Active
+SER200047,"James Wilson, NP",2,Dermatology,1280060990,Active
+SER200048,"Amber Payne, MD",1,Oncology,1229042503,Active
+SER200049,"Jonah Adams, MD",4,Endocrinology,1005982386,Active
+SER200050,"Reagan Rice, MD",1,Oncology,1690161527,Active
+SER200051,"Dana Dominguez, MD",1,Oncology,1314819133,Active
+SER200052,"Victoria Gardner, MD",4,Internal Medicine,1031628297,Active
+SER200053,"Gavin Howard, NP",2,General Surgery,1099677443,Active
+SER200054,"Rosa Maldonado, MD",1,Radiology,1807951720,Active
+SER200055,"Blake Burns, MD",1,General Surgery,1558193629,Active
+SER200056,"Jace Rios, MD",4,Cardiology,1360232157,Active
+SER200057,"Virginia Contreras, MD",1,Emergency Medicine,1508689512,Active
+SER200058,"Lydia Lane, MD",1,Dermatology,1424022052,Active
+SER200059,"Arianna George, MD",1,Anesthesiology,1645504625,Active
+SER200060,"Stephanie Perkins, NP",2,General Surgery,1418452694,Active
+SER200061,"Autumn Jackson, MD",1,Orthopedics,1335367140,Active
+SER200062,"Gage Rivera, MD",1,Cardiology,1862151849,Active
+SER200063,"Abigail Rodriguez, MD",1,Neurology,1422089851,Active
+SER200064,"Carol Allen, MD",1,Anesthesiology,1253436772,Active
+SER200065,"Walter Hughes, MD",1,Pediatrics,1751725204,Active
+SER200066,"Arthur Hale, MD",4,Emergency Medicine,1347761513,Active
+SER200067,"Joe Boyd, MD",1,Internal Medicine,1842504004,Active
+SER200068,"Ava Collins, MD",1,Psychiatry,1599666727,Active
+SER200069,"Audrey Willis, PA",3,Family Medicine,1636263949,Active
+SER200070,"Eugene Sanders, MD",1,Obstetrics & Gynecology,1120744770,Active
+SER200071,"Oscar Smith, MD",1,Orthopedics,1790582851,Active
+SER200072,"Savannah French, MD",1,Cardiology,1002053273,Active
+SER200073,"Tammy Reed, MD",1,Pediatrics,1245250459,Active
+SER200074,"Ashley Tucker, MD",1,Psychiatry,1829864603,Active
+SER200075,"Calvin James, MD",1,General Surgery,1179012971,Active
+SER200076,"Colton Gonzalez, MD",1,General Surgery,1665832253,Active
+SER200077,"Ralph Cruz, MD",1,Cardiology,1370941845,Active
+SER200078,"Jean Garcia, MD",4,Radiology,1630040773,Active
+SER200079,"Nathan Ortega, MD",1,Dermatology,1391045283,Active
+SER200080,"Ruby Stephens, PA",3,Endocrinology,1580753156,Active

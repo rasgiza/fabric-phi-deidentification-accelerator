@@ -1,0 +1,31 @@
+DX_ID,DX_NAME,CURRENT_ICD10_LIST
+EDG400001,Essential (primary) hypertension,I10
+EDG400002,Type 2 diabetes mellitus without complications,E11.9
+EDG400003,"Hyperlipidemia, unspecified",E78.5
+EDG400004,Acute upper respiratory infection,J06.9
+EDG400005,Low back pain,M54.50
+EDG400006,"Major depressive disorder, single episode",F32.9
+EDG400007,Generalized anxiety disorder,F41.1
+EDG400008,"Asthma, unspecified",J45.909
+EDG400009,Gastro-esophageal reflux disease,K21.9
+EDG400010,"Obesity, unspecified",E66.9
+EDG400011,Acute pharyngitis,J02.9
+EDG400012,Urinary tract infection,N39.0
+EDG400013,Osteoarthritis of knee,M17.9
+EDG400014,Chronic obstructive pulmonary disease,J44.9
+EDG400015,Atrial fibrillation,I48.91
+EDG400016,"Hypothyroidism, unspecified",E03.9
+EDG400017,"Migraine, unspecified",G43.909
+EDG400018,"Anemia, unspecified",D64.9
+EDG400019,Acute bronchitis,J20.9
+EDG400020,Vitamin D deficiency,E55.9
+EDG400021,"Chronic kidney disease, stage 3",N18.3
+EDG400022,Coronary artery disease,I25.10
+EDG400023,"Pneumonia, unspecified organism",J18.9
+EDG400024,"Cellulitis, unspecified",L03.90
+EDG400025,Allergic rhinitis,J30.9
+EDG400026,Fracture of forearm,S52.90
+EDG400027,"Sepsis, unspecified organism",A41.9
+EDG400028,Congestive heart failure,I50.9
+EDG400029,Iron deficiency anemia,D50.9
+EDG400030,Dehydration,E86.0

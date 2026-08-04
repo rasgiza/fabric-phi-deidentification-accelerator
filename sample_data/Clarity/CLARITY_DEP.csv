@@ -1,0 +1,44 @@
+DEPARTMENT_ID,DEPARTMENT_NAME,SPECIALTY,REV_LOC_NAME,ACTIVE_STATUS
+DEP300001,Main Hospital Family Medicine,Family Medicine,Main Hospital,Active
+DEP300002,Main Hospital Cardiology,Cardiology,Main Hospital,Active
+DEP300003,Main Hospital Emergency,Emergency,Main Hospital,Active
+DEP300004,Main Hospital General Surgery,General Surgery,Main Hospital,Active
+DEP300005,Main Hospital Oncology,Oncology,Main Hospital,Active
+DEP300006,Main Hospital Psychiatry,Psychiatry,Main Hospital,Active
+DEP300007,Main Hospital Radiology,Radiology,Main Hospital,Inactive
+DEP300008,Main Hospital Primary Care,Primary Care,Main Hospital,Active
+DEP300009,North Clinic Cardiology,Cardiology,North Clinic,Active
+DEP300010,North Clinic Pediatrics,Pediatrics,North Clinic,Active
+DEP300011,North Clinic Orthopedics,Orthopedics,North Clinic,Active
+DEP300012,North Clinic General Surgery,General Surgery,North Clinic,Active
+DEP300013,North Clinic Neurology,Neurology,North Clinic,Active
+DEP300014,North Clinic Dermatology,Dermatology,North Clinic,Active
+DEP300015,North Clinic Psychiatry,Psychiatry,North Clinic,Active
+DEP300016,North Clinic Endocrinology,Endocrinology,North Clinic,Active
+DEP300017,South Clinic Cardiology,Cardiology,South Clinic,Active
+DEP300018,South Clinic Pediatrics,Pediatrics,South Clinic,Active
+DEP300019,South Clinic OB/GYN,OB/GYN,South Clinic,Active
+DEP300020,South Clinic Neurology,Neurology,South Clinic,Active
+DEP300021,South Clinic Oncology,Oncology,South Clinic,Active
+DEP300022,South Clinic Dermatology,Dermatology,South Clinic,Active
+DEP300023,South Clinic Endocrinology,Endocrinology,South Clinic,Active
+DEP300024,West Medical Center Cardiology,Cardiology,West Medical Center,Active
+DEP300025,West Medical Center Orthopedics,Orthopedics,West Medical Center,Active
+DEP300026,West Medical Center OB/GYN,OB/GYN,West Medical Center,Active
+DEP300027,West Medical Center General Surgery,General Surgery,West Medical Center,Active
+DEP300028,West Medical Center Neurology,Neurology,West Medical Center,Active
+DEP300029,West Medical Center Dermatology,Dermatology,West Medical Center,Active
+DEP300030,West Medical Center Psychiatry,Psychiatry,West Medical Center,Active
+DEP300031,West Medical Center Primary Care,Primary Care,West Medical Center,Inactive
+DEP300032,Downtown Campus Family Medicine,Family Medicine,Downtown Campus,Inactive
+DEP300033,Downtown Campus Cardiology,Cardiology,Downtown Campus,Active
+DEP300034,Downtown Campus Pediatrics,Pediatrics,Downtown Campus,Active
+DEP300035,Downtown Campus General Surgery,General Surgery,Downtown Campus,Active
+DEP300036,Downtown Campus Neurology,Neurology,Downtown Campus,Active
+DEP300037,Downtown Campus Oncology,Oncology,Downtown Campus,Active
+DEP300038,Downtown Campus Dermatology,Dermatology,Downtown Campus,Active
+DEP300039,Downtown Campus Radiology,Radiology,Downtown Campus,Active
+DEP300040,Downtown Campus Endocrinology,Endocrinology,Downtown Campus,Active
+DEP300041,Downtown Campus Primary Care,Primary Care,Downtown Campus,Inactive
+DEP300042,Children's Pavilion OB/GYN,OB/GYN,Children's Pavilion,Active
+DEP300043,Children's Pavilion General Surgery,General Surgery,Children's Pavilion,Active

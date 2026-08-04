@@ -1,0 +1,7 @@
+ENC_TYPE_C,NAME
+1,Office Visit
+2,Hospital Encounter
+3,Emergency
+4,Telemedicine
+5,Procedure Visit
+6,Lab Visit

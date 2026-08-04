@@ -36,7 +36,9 @@
 
 **Done for you by the launcher**
 
-1. Land the 13 synthetic Caboodle CSVs at `Files/raw/caboodle_provider/` in `lh_raw`.
+1. Land the synthetic source CSVs in `lh_raw`: Caboodle (13) at `Files/raw/caboodle_provider/`
+   and Clarity (24) at `Files/raw/clarity/`. Each source is independent — the pipeline
+   de-identifies whichever ones are present.
 2. Upload the accelerator `src/` and `config/` to `Files/accelerator/` in **each** lakehouse
    (`lh_raw`, `lh_analytics`, `lh_vault`) — every notebook imports the package from its own
    attached lakehouse.
