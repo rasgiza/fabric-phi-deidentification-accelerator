@@ -14,12 +14,12 @@ identifiers** survive into Gold.
 
 ## Two ways to set this up
 
-- **Option A — One-click launcher (fastest).** Import
-  [`PHI_Deid_Launcher.ipynb`](PHI_Deid_Launcher.ipynb) into any Fabric workspace and
-  **Run All**. It creates the three workspaces + lakehouses, uploads `src/`, `config/`,
-  and the sample data, and imports the notebooks — auto-patching the cross-workspace
-  config so there are **no manual GUID edits**. You still set the pepper and run the
-  notebooks (step 4–6 below). Requires permission to create workspaces.
+- **Option A — One-click launcher (fastest).** Create **one** workspace, import
+  [`PHI_Deid_Launcher.ipynb`](PHI_Deid_Launcher.ipynb) into it, and **Run All**. That host
+  workspace becomes **Raw (PHI)**; the launcher creates the other two workspaces + all three
+  lakehouses, uploads `src/`, `config/`, and the sample data, and imports the notebooks —
+  auto-patching the cross-workspace config so there are **no manual GUID edits**. You still set
+  the pepper and run the notebooks (step 4–6 below). Requires permission to create workspaces.
 - **Option B — Manual (full control).** Follow the 6 steps below and click through the
   portal yourself. Best if you want to see exactly what each piece does.
 

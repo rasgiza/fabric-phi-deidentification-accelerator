@@ -20,10 +20,11 @@ Copilot point at contains **no PHI by construction**.
 
 ### 👉 New here? Start with the **[QUICKSTART](QUICKSTART.md)** — 6 steps to a PHI-free Gold layer.
 
-> ⚡ **Want it stood up automatically?** Import **[`PHI_Deid_Launcher.ipynb`](PHI_Deid_Launcher.ipynb)**
-> into any Fabric workspace and **Run All** — it creates the workspaces + lakehouses, uploads the
-> code/config/data, and imports the notebooks (auto-patched, no manual GUID edits). Manual setup
-> stays fully supported.
+> ⚡ **Want it stood up automatically?** Create one workspace, import
+> **[`PHI_Deid_Launcher.ipynb`](PHI_Deid_Launcher.ipynb)** into it, and **Run All** — that
+> workspace becomes Raw, and the launcher creates the other two workspaces + lakehouses, uploads
+> the code/config/data, and imports the notebooks (auto-patched, no manual GUID edits). Manual
+> setup stays fully supported.
 
 ## Table of contents
 
