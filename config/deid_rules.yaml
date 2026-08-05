@@ -225,8 +225,14 @@ profiles:
         DX_ED_YN_C:     passthrough
 
       # ---- ORDER_MED / ORDER_PROC / ORDER_RESULTS: order + result grain ---------------
+      # Order IDs are tokenized for the SAME reason PAT_ENC_CSN_ID is: they are printed on
+      # medication labels and lab requisitions/result reports, so they are a direct linkage
+      # path back to the source system for anyone holding a piece of paper. Tokenizing in a
+      # stable namespace preserves the order_proc <-> order_results join. As a bonus this
+      # keeps 9-digit numeric Clarity IDs (VARCHAR in Epic) out of the residual-PHI gate,
+      # where a bare run of 9 digits is indistinguishable from an SSN.
       clarity_order_med:
-        ORDER_MED_ID:      passthrough              # assigned to the ORDER, not the person
+        ORDER_MED_ID:      {strategy: tokenize, namespace: order_med, prefix: "ORM-"}
         PAT_ID:            {strategy: tokenize, namespace: pat_id, prefix: "EP-"}
         PAT_ENC_CSN_ID:    {strategy: tokenize, namespace: csn, prefix: "ENC-"}
         MEDICATION_ID:     passthrough
@@ -239,7 +245,7 @@ profiles:
         HV_DISCRETE_DOSE:  passthrough
 
       clarity_order_proc:
-        ORDER_PROC_ID:     passthrough
+        ORDER_PROC_ID:     {strategy: tokenize, namespace: order_proc, prefix: "ORP-"}
         PAT_ID:            {strategy: tokenize, namespace: pat_id, prefix: "EP-"}
         PAT_ENC_CSN_ID:    {strategy: tokenize, namespace: csn, prefix: "ENC-"}
         PROC_ID:           passthrough
@@ -251,7 +257,8 @@ profiles:
         ORDER_TYPE:        passthrough
 
       clarity_order_results:
-        ORDER_PROC_ID:   passthrough
+        # same namespace as clarity_order_proc -> the join survives tokenization
+        ORDER_PROC_ID:   {strategy: tokenize, namespace: order_proc, prefix: "ORP-"}
         LINE:            passthrough
         PAT_ID:          {strategy: tokenize, namespace: pat_id, prefix: "EP-"}
         PAT_ENC_CSN_ID:  {strategy: tokenize, namespace: csn, prefix: "ENC-"}
@@ -454,7 +461,7 @@ profiles:
         DX_ED_YN_C:     passthrough
 
       clarity_order_med:
-        ORDER_MED_ID:      passthrough
+        ORDER_MED_ID:      {strategy: tokenize, namespace: order_med, prefix: "ORM-"}
         PAT_ID:            {strategy: tokenize, namespace: pat_id, prefix: "EP-"}
         PAT_ENC_CSN_ID:    {strategy: tokenize, namespace: csn, prefix: "ENC-"}
         MEDICATION_ID:     passthrough
@@ -467,7 +474,7 @@ profiles:
         HV_DISCRETE_DOSE:  passthrough
 
       clarity_order_proc:
-        ORDER_PROC_ID:     passthrough
+        ORDER_PROC_ID:     {strategy: tokenize, namespace: order_proc, prefix: "ORP-"}
         PAT_ID:            {strategy: tokenize, namespace: pat_id, prefix: "EP-"}
         PAT_ENC_CSN_ID:    {strategy: tokenize, namespace: csn, prefix: "ENC-"}
         PROC_ID:           passthrough
@@ -479,7 +486,8 @@ profiles:
         ORDER_TYPE:        passthrough
 
       clarity_order_results:
-        ORDER_PROC_ID:   passthrough
+        # same namespace as clarity_order_proc -> the join survives tokenization
+        ORDER_PROC_ID:   {strategy: tokenize, namespace: order_proc, prefix: "ORP-"}
         LINE:            passthrough
         PAT_ID:          {strategy: tokenize, namespace: pat_id, prefix: "EP-"}
         PAT_ENC_CSN_ID:  {strategy: tokenize, namespace: csn, prefix: "ENC-"}
