@@ -147,5 +147,6 @@ prove it live in Act 5.
 - **"What about doctors' notes / free text?"** → Already wired, not a roadmap item.
   `FactEncounter.ReasonForVisitNote` runs through the `redact_text` strategy on every Silver
   run (Presidio when the `[nlp]` extra is installed, a regex detector otherwise), and the
-  scorecard publishes measured recall against a labeled fixture. Tonic Textual remains the
-  complementary buy for high-volume clinical narrative.
+  scorecard **hard-fails** on any missed structured identifier while reporting contextual recall
+  as `NOT_EVALUATED` (benchmarking that honestly needs a licensed corpus like i2b2/n2c2). Tonic
+  Textual remains the complementary buy for high-volume clinical narrative.

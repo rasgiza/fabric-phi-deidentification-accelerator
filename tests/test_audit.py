@@ -14,10 +14,25 @@ from fabric_phi_deid.audit import (
 
 def test_fingerprint_is_deterministic_and_order_independent(cfg):
     fp1 = config_fingerprint(cfg)
-    reordered = {"profiles": cfg["profiles"], "active_profile": cfg.get("active_profile")}
+    reordered = dict(reversed(list(cfg.items())))
     fp2 = config_fingerprint(reordered)
     assert fp1 == fp2
     assert len(fp1) == 64  # sha256 hex
+
+
+def test_fingerprint_covers_the_privacy_gate_waivers(cfg):
+    """Editing a risk acceptance must change the fingerprint.
+
+    The fingerprint answers "which exact rulebook produced this output". A recorded
+    acceptance is part of that rulebook: it decides whether a failing k-anonymity gate blocks
+    the run. If two runs with different waivers shared a fingerprint, the evidence pack could
+    not tell them apart -- and the waiver is precisely the thing a reviewer is checking.
+    """
+    import copy
+
+    mutated = copy.deepcopy(cfg)
+    mutated["privacy_gates"]["k_anonymity"]["accepted_risk"]["accepted_by"] = "someone else"
+    assert config_fingerprint(mutated) != config_fingerprint(cfg)
 
 
 def test_fingerprint_changes_when_rule_changes(cfg):

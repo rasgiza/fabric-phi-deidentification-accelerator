@@ -131,16 +131,60 @@ without exposing the original value.
 
 | Risk area | Evaluation | Enforcement in this repo |
 |-----------|------------|--------------------------|
-| Small population groups | Assessed | **k-anonymity** over quasi-identifiers (`BirthYear, Gender, Race, ZIP`) in `NB_scorecard` |
-| Rare / skewed sensitive values | Assessed | **l-diversity** + **t-closeness** on the sensitive attribute |
-| Combination (quasi-identifier) attacks | Assessed | [src/fabric_phi_deid/privacy_metrics.py](../src/fabric_phi_deid/privacy_metrics.py) (equivalence classes) |
+| Small population groups | Assessed + **enforced** | **k-anonymity** over quasi-identifiers (`BirthYear, Gender, Race, ZIP`) — hard gate in `NB_scorecard`, waivable only via a signed `accepted_risk` block |
+| Rare / skewed sensitive values | Assessed + **enforced** | **l-diversity** + **t-closeness** on the sensitive attribute — hard gates, same waiver rules |
+| Combination (quasi-identifier) attacks | Assessed | [src/fabric_phi_deid/privacy_metrics.py](../src/fabric_phi_deid/privacy_metrics.py) (equivalence classes); residual tail closed with `suppress_quasi_identifiers_spark` |
 | Cross-dataset linkage | Assessed | `[manual analyst review — document linkable datasets]` |
 | External public datasets | Assessed | `[manual analyst review — document external sources considered]` |
-| Free-text (clinical notes) identifiers | Detected + measured | [ner_text.py](../src/fabric_phi_deid/ner_text.py) (Presidio NER) + [eval_harness.py](../src/fabric_phi_deid/eval_harness.py) recall / F1 |
+| Free-text (clinical notes) identifiers | Detected; **structured subset** enforced, recall **not benchmarked** | [ner_text.py](../src/fabric_phi_deid/ner_text.py) (Presidio NER) + [eval_harness.py](../src/fabric_phi_deid/eval_harness.py). The scorecard hard-gates structured identifiers and reports recall as `NOT_EVALUATED` — an external annotated corpus (i2b2/n2c2) is required for a defensible figure |
 
 Quantitative metrics are computed automatically and persisted as evidence; **linkage against
 external datasets is a documented manual review** performed by `[Privacy / Data Science]` before
-release. Thresholds (default k≥5, l≥2, t≤0.2) are tunable in `NB_scorecard`.
+release. Thresholds (default k≥5, l≥2, t≤0.2), the quasi-identifier set, and any recorded risk
+acceptance live together in `config/deid_rules.yaml` under `privacy_gates:` — so the control and
+its waiver are reviewed in the same file, by the same person, under the same version control as
+the column rules.
+
+### 6.1 What generalization alone can actually achieve
+
+Measured on the shipped synthetic estate (`gold_safe_dim_patient`, 50,200 patients). Every row is
+a real count from the live table, not an estimate:
+
+| Quasi-identifier set | k | Classes below k=5 | Rows below k=5 |
+|---|---|---|---|
+| `BirthYear + Gender + Race + ZIP3` *(shipped)* | 1 | 36,923 | 48,649 (96.9%) |
+| `BirthYear + Gender + ZIP3` | 1 | 23,500 | 42,141 (83.9%) |
+| 5-year band `+ Gender + Race + ZIP3` | 1 | 18,062 | 30,399 (60.6%) |
+| 10-year band `+ Gender + Race + ZIP3` | 1 | 11,256 | 20,328 (40.5%) |
+| `AgeBand + Gender + Race + ZIP3` | 1 | 4,997 | 10,400 (20.7%) |
+| `BirthYear + Gender + Race + ZIP1` | 1 | 5,868 | 12,363 (24.6%) |
+| `BirthYear + Gender + Race` *(no ZIP)* | 1 | 334 | 646 (1.3%) |
+| 10-year band `+ Gender + Race + ZIP1` | 1 | 364 | 674 (1.3%) |
+| `AgeBand + Gender + Race + ZIP1` | 1 | 142 | 310 (0.6%) |
+
+**The load-bearing observation: no configuration reaches k≥5.** Even the most aggressive one —
+four age bands and a single ZIP digit, which has destroyed most of the analytic value — still
+leaves 142 classes containing a lone individual. Coarsening moves the tail; it does not remove
+it. This is why serious disclosure-control tooling (ARX, sdcMicro) pairs generalization with
+**suppression**, and why this repo ships
+[`suppress_quasi_identifiers_spark`](../src/fabric_phi_deid/privacy_metrics.py) rather than only a
+metric.
+
+Given a failing gate you therefore have three honest options, and the accelerator supports all
+three explicitly:
+
+1. **Generalize further** — widen the bands or truncate ZIP harder, accepting the analytic cost.
+2. **Suppress the residual tail** — blank the quasi-identifiers of sub-*k* rows while keeping the
+   rows themselves, so facts in the star schema are not orphaned and measures do not silently
+   change. Note that this needs a computed cutoff, not a naive `count < k` filter: blanking those
+   rows collapses them into a single all-NULL class made up of precisely the most identifiable
+   people, which can itself violate *k*.
+3. **Accept the risk** — record a named signer, a scope, and an expiry in `accepted_risk`. The run
+   then reports `PASSED_WITH_ACCEPTED_RISK`, never `PASSED`.
+
+The shipped demo takes option 3 with `accepted_by: "UNSIGNED — repository default"`, because k=1
+is arithmetically unavoidable when publishing birth year and 3-digit ZIP at patient grain, and no
+real individual is represented in Tonic.ai-generated data. **Replace it before real PHI.**
 
 ---
 
@@ -169,7 +213,8 @@ Retain the following as the litigation / OCR evidence trail:
 | De-identification job logs | audit logger + per-run manifest ([audit.py](../src/fabric_phi_deid/audit.py)) | Spark/notebook run history |
 | Config fingerprint (what rules ran) | `config_fingerprint()` in each manifest | — |
 | Scorecard / risk assessment | PHI-free `scorecard_<id>.json` in `Files/audit/` | — |
-| Detector quality (recall / F1) | [eval_harness.py](../src/fabric_phi_deid/eval_harness.py) against labeled fixture | — |
+| Detector quality (structured identifiers) | [eval_harness.py](../src/fabric_phi_deid/eval_harness.py) against labeled fixture — hard gate | — |
+| Detector recall (contextual identifiers) | **`NOT_EVALUATED`** — declared in the scorecard artifact, not estimated | `[benchmark on your own annotated corpus]` |
 | Approval & determination records | determination method/reviewer/expiry in scorecard artifact | `[signed determination on file]` |
 | Data lineage | — | Purview Data Map lineage |
 | Sensitivity label assignments | Tier 0 classification → rulebook | Purview Information Protection |
@@ -224,7 +269,7 @@ Evidence this standard + the accelerator can produce if challenged:
 | 4 | AI systems only accessed approved datasets | Gold = no PHI by construction; `gold_safe_*` only |
 | 5 | BAAs existed with vendors | `[organizational records]` |
 | 6 | Access was logged and monitored | audit logger; OneLake / Purview audit logs |
-| 7 | Re-identification risk was assessed | k-anon / l-div / t-closeness + `scorecard_<id>.json` |
+| 7 | Re-identification risk was assessed | k-anon / l-div / t-closeness gates + any recorded `accepted_risk` signer/scope/expiry, in `scorecard_<id>.json` |
 | 8 | Governance approvals were documented | §10 sign-off + determination metadata + [pre_real_phi_checklist.md](pre_real_phi_checklist.md) |
 
 ## Appendix B — Control → Fabric capability crosswalk (summary)

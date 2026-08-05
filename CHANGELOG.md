@@ -6,6 +6,55 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Changed
+- **Re-identification risk is now a gate, not a statistic.** k-anonymity, l-diversity and
+  t-closeness were computed, printed, and then ignored — `NB_scorecard` reported `k=1` on the
+  shipped estate and passed anyway, because those checks were advisory. Residual disclosure risk
+  is the thing this accelerator exists to manage, and it was the one check that could not fail
+  the run. All three are now **hard gates** read from `config/deid_rules.yaml` under
+  `privacy_gates:`, and a missed threshold blocks the run.
+
+  Because a hard gate with no escape valve just gets deleted by the first team it inconveniences,
+  the gates are **waivable — but only in writing**. A new `accepted_risk` block records a named
+  signer, a scope, a reason, and an expiry date; anything missing, blank, placeholder-looking
+  (`TODO`, `<name>`, …) or past its expiry **fails closed**. A waived run reports
+  `PASSED_WITH_ACCEPTED_RISK` — never `PASSED` — and prints the signer, scope and expiry into the
+  evidence artifact. Rationale: an advisory check and an accepted risk look identical in a green
+  run and are completely different in an audit.
+
+  The shipped demo ships **waived**, with `accepted_by: "UNSIGNED — repository default"`, because
+  k=1 is arithmetically unavoidable when publishing birth year and 3-digit ZIP at patient grain.
+  See [docs/deidentification_standard.md §6.1](docs/deidentification_standard.md) for the measured
+  proof: across nine quasi-identifier configurations on 50,200 patients, **none reaches k≥5** —
+  even four age bands plus a single ZIP digit still leaves 142 lone individuals. Generalization
+  moves the tail; it does not remove it.
+
+- **Withdrew the published free-text recall number (`recall=0.524`).** It was measured on 7
+  synthetic notes containing 21 spans, against fixtures authored alongside the detector — that
+  measures *self-consistency*, not recall, and a fabricated-looking metric on a compliance tool
+  costs more credibility than no metric. The scorecard now reports free-text recall as an explicit
+  `NOT_EVALUATED` row stating why, and points at i2b2/n2c2 (licensed, not redistributable) as what
+  a defensible figure would require. Documentation that told presenters to "state the number" was
+  corrected in the same pass.
+
+### Added
+- **`suppress_quasi_identifiers_spark` / `suppression_cutoff`** in `privacy_metrics` — the remedy
+  that makes the new k-anonymity gate actionable rather than merely obstructive. This performs
+  *cell* suppression: it nulls the quasi-identifiers of offending rows and **keeps every row**,
+  because row suppression would orphan facts in the star schema and silently change every measure
+  in the model. `suppression_cutoff` exists because the naive `count < k` filter invents a new
+  violation — blanking sub-*k* rows collapses them into one all-NULL equivalence class composed of
+  exactly the most identifiable people, so the cutoff has to rise until that pool is empty or
+  itself ≥ *k*.
+- **A new free-text hard gate: the detector must miss no *structured* identifier** (SSN, phone,
+  email, card, IP, URL, MRN). These are exact-form patterns, so a miss is a defect rather than a
+  model-quality question — verified at `tp=11, fp=0, fn=0` over the fixture corpus.
+- **`RiskAcceptance`, `GateOutcome`, `evaluate_gate`, `load_risk_acceptance`** in `determination`,
+  plus `PRIVACY_GATE_SPECS` and `privacy_gates` schema validation in `config`. A malformed
+  acceptance block surfaces as a defect rather than being silently skipped.
+- Config-fingerprint coverage of the waivers: changing `accepted_by` changes the run fingerprint,
+  so a waiver cannot be swapped without leaving a trace in the audit trail.
+
 ### Fixed
 - **The scorecard could certify a compliance claim the rulebook did not support.**
   `NB_scorecard` hardcoded `DETERMINATION_METHOD = "safe_harbor"` and never checked it

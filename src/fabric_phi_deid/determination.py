@@ -36,12 +36,20 @@ __all__ = [
     "DeterminationReport",
     "MethodEligibility",
     "DerivedValueRule",
+    "RiskAcceptance",
+    "GateOutcome",
     "SAFE_HARBOR",
     "EXPERT_DETERMINATION",
     "DERIVED_VALUE_STRATEGIES",
+    "GATE_PASS",
+    "GATE_ACCEPTED_RISK",
+    "GATE_FAIL",
+    "MIN_ACCEPTANCE_REASON_CHARS",
     "assess_method_eligibility",
     "build_determination_report",
     "residual_scan_from_hits",
+    "load_risk_acceptance",
+    "evaluate_gate",
 ]
 
 
@@ -160,6 +168,225 @@ def assess_method_eligibility(
         profile=profile,
         claimed_method=claimed_method,
         derived_rules=tuple(derived),
+    )
+
+
+# --------------------------------------------------------------------------------------
+# Recorded risk acceptance — the only way a failing disclosure-risk gate goes green
+# --------------------------------------------------------------------------------------
+GATE_PASS = "PASS"  # noqa: S105 - a gate verdict, not a credential
+GATE_ACCEPTED_RISK = "ACCEPTED_RISK"
+GATE_FAIL = "FAIL"
+
+# A reason short enough to be a shrug is not an audit record. This floor is arbitrary in its
+# exact value and deliberate in its existence: it stops "ok", "n/a" and "demo" from buying a
+# pass on a re-identification control.
+MIN_ACCEPTANCE_REASON_CHARS = 20
+
+# Substrings that mean the template was never filled in. An unedited placeholder must not be
+# able to sign off on residual re-identification risk.
+_PLACEHOLDER_MARKERS = ("todo", "fixme", "changeme", "change me", "xxx", "<", "tbd")
+
+
+def _placeholder_defect(field_name: str, value: Any) -> str | None:
+    """Return a defect string when ``value`` is missing, blank or an unedited placeholder."""
+    if not isinstance(value, str) or not value.strip():
+        return f"{field_name} is missing or blank"
+    lowered = value.strip().lower()
+    for marker in _PLACEHOLDER_MARKERS:
+        if marker in lowered:
+            return f"{field_name} still contains the placeholder text {marker!r}"
+    return None
+
+
+@dataclass(frozen=True)
+class RiskAcceptance:
+    """A named human's time-limited, written acceptance of a failing disclosure-risk control.
+
+    Why this type exists
+    --------------------
+    Some disclosure-risk controls cannot be satisfied by the data you actually have. A
+    patient-grain table that publishes birth year and 3-digit ZIP will not reach k>=5 on any
+    realistic population — the quasi-identifier domain is simply larger than the cohort. The
+    honest options are to generalize further, to suppress the tail, or to *accept the residual
+    risk*. The third option is legitimate; accepting it silently is not.
+
+    An advisory check and an accepted risk look identical in a green run and are completely
+    different in an audit. This dataclass forces the difference into the evidence artifact: a
+    reason, a person, a scope, and an expiry date. When the acceptance lapses or the placeholder
+    was never edited, the gate fails closed.
+    """
+
+    control: str
+    reason: str
+    accepted_by: str
+    expires_utc: str
+    applies_to: str
+
+    def is_expired(self, as_of: datetime | None = None) -> bool:
+        """True when the acceptance has lapsed. An unparseable date counts as expired."""
+        as_of = as_of or datetime.now(UTC)
+        try:
+            expires = datetime.fromisoformat(self.expires_utc)
+        except (TypeError, ValueError):
+            return True
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=UTC)
+        return as_of >= expires
+
+    def defects(self, as_of: datetime | None = None) -> list[str]:
+        """Every reason this acceptance cannot be relied on (empty list == usable)."""
+        problems: list[str] = []
+        for name, value in (
+            ("reason", self.reason),
+            ("accepted_by", self.accepted_by),
+            ("applies_to", self.applies_to),
+            ("expires_utc", self.expires_utc),
+        ):
+            defect = _placeholder_defect(name, value)
+            if defect:
+                problems.append(defect)
+
+        if isinstance(self.reason, str) and len(self.reason.strip()) < MIN_ACCEPTANCE_REASON_CHARS:
+            problems.append(
+                f"reason is shorter than {MIN_ACCEPTANCE_REASON_CHARS} characters — "
+                "state what was accepted and why"
+            )
+        if self.is_expired(as_of):
+            problems.append(f"acceptance expired on {self.expires_utc}")
+        return problems
+
+    def is_usable(self, as_of: datetime | None = None) -> bool:
+        return not self.defects(as_of)
+
+    def summary(self) -> str:
+        verdict = "usable" if self.is_usable() else "UNUSABLE"
+        return (
+            f"[risk-acceptance {verdict}] {self.control}: accepted by {self.accepted_by!r} "
+            f"for {self.applies_to!r} until {self.expires_utc}"
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "control": self.control,
+            "reason": self.reason,
+            "accepted_by": self.accepted_by,
+            "applies_to": self.applies_to,
+            "expires_utc": self.expires_utc,
+            "expired": self.is_expired(),
+            "usable": self.is_usable(),
+            "defects": self.defects(),
+        }
+
+
+def load_risk_acceptance(cfg: Any, control: str) -> RiskAcceptance | None:
+    """Read ``privacy_gates.<control>.accepted_risk`` out of a loaded config.
+
+    Returns ``None`` when no acceptance is recorded — which is the deny-by-default case, not an
+    error. A malformed block is returned as a ``RiskAcceptance`` with blank fields rather than
+    silently ignored, so ``defects()`` reports it instead of it vanishing into a pass.
+    """
+    if not isinstance(cfg, dict):
+        return None
+    gates = cfg.get("privacy_gates")
+    if not isinstance(gates, dict):
+        return None
+    gate = gates.get(control)
+    if not isinstance(gate, dict):
+        return None
+    accepted = gate.get("accepted_risk")
+    if accepted is None:
+        return None
+    if not isinstance(accepted, dict):
+        accepted = {}
+    return RiskAcceptance(
+        control=control,
+        reason=str(accepted.get("reason", "") or ""),
+        accepted_by=str(accepted.get("accepted_by", "") or ""),
+        expires_utc=str(accepted.get("expires_utc", "") or ""),
+        applies_to=str(accepted.get("applies_to", "") or ""),
+    )
+
+
+@dataclass
+class GateOutcome:
+    """The three-state result of a disclosure-risk control: PASS / ACCEPTED_RISK / FAIL."""
+
+    control: str
+    measured_pass: bool
+    detail: str = ""
+    acceptance: RiskAcceptance | None = None
+    acceptance_defects: tuple[str, ...] = ()
+
+    @property
+    def status(self) -> str:
+        if self.measured_pass:
+            return GATE_PASS
+        if self.acceptance is not None and not self.acceptance_defects:
+            return GATE_ACCEPTED_RISK
+        return GATE_FAIL
+
+    @property
+    def passes(self) -> bool:
+        """True when the gate does not block the run (measured pass OR a valid acceptance)."""
+        return self.status != GATE_FAIL
+
+    def summary(self) -> str:
+        if self.status == GATE_PASS:
+            return f"[{self.control} PASS] {self.detail}".rstrip()
+        if self.status == GATE_ACCEPTED_RISK:
+            assert self.acceptance is not None  # noqa: S101 - narrowed by status
+            return (
+                f"[{self.control} ACCEPTED_RISK] {self.detail} — accepted by "
+                f"{self.acceptance.accepted_by!r} for {self.acceptance.applies_to!r} "
+                f"until {self.acceptance.expires_utc}: {self.acceptance.reason}"
+            )
+        if self.acceptance_defects:
+            return (
+                f"[{self.control} FAIL] {self.detail} — a risk acceptance is recorded but "
+                f"cannot be relied on: {'; '.join(self.acceptance_defects)}"
+            )
+        return (
+            f"[{self.control} FAIL] {self.detail} — no risk acceptance recorded. Generalize "
+            f"further, suppress the small classes, or record privacy_gates.{self.control}."
+            "accepted_risk with a reason, an owner, a scope and an expiry."
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "control": self.control,
+            "status": self.status,
+            "measured_pass": self.measured_pass,
+            "passes": self.passes,
+            "detail": self.detail,
+            "summary": self.summary(),
+            "acceptance": self.acceptance.to_dict() if self.acceptance else None,
+            "acceptance_defects": list(self.acceptance_defects),
+        }
+
+
+def evaluate_gate(
+    control: str,
+    measured_pass: bool,
+    acceptance: RiskAcceptance | None = None,
+    *,
+    detail: str = "",
+    as_of: datetime | None = None,
+) -> GateOutcome:
+    """Combine a measured control result with any recorded acceptance into a gate outcome.
+
+    Deny-by-default: a measurement that fails with no usable acceptance is a ``FAIL`` that
+    blocks the run. This is the difference between a control and a statistic.
+    """
+    defects: tuple[str, ...] = ()
+    if acceptance is not None and not measured_pass:
+        defects = tuple(acceptance.defects(as_of))
+    return GateOutcome(
+        control=control,
+        measured_pass=measured_pass,
+        detail=detail,
+        acceptance=acceptance,
+        acceptance_defects=defects,
     )
 
 

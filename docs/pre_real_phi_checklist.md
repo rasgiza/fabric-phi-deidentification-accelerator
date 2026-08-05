@@ -21,7 +21,9 @@ Do **not** point this pipeline at real PHI until every box is checked and signed
 - [ ] The **Presidio backend is installed** (`pip install 'fabric-phi-deid[nlp]'`) in the Spark
       environment. Without it `ner_text` falls back to a regex detector that catches structured
       identifiers (MRN, phone, email, SSN, card, IP, URL) but **not** names, places, or dates.
-      Check the measured free-text recall on the scorecard before trusting the output.
+      The scorecard hard-gates the structured subset but reports recall as `NOT_EVALUATED` —
+      it does **not** publish a recall figure. **Benchmark the detector on your own annotated
+      notes before trusting it on real narrative text.**
 - [ ] A **Business Associate Agreement (BAA)** and data-use terms cover every workspace and
       downstream consumer of the de-identified output.
 - [ ] Data classification / catalog labels (Tier 0) are complete and are the authoritative
@@ -53,8 +55,12 @@ Do **not** point this pipeline at real PHI until every box is checked and signed
 - [ ] `NB_scorecard` runs on the **real** `gold_safe_*` output and **passes all hard
       asserts** (0 of the 18 identifiers detectable; MRN prefix present; no `DateOfBirth`;
       ZIP ≤ 3 digits; residual-PHI regex scan clean).
-- [ ] k-anonymity on the chosen quasi-identifier set meets your policy threshold (advisory in
-      the synthetic demo; make it a **hard gate** for real data).
+- [ ] k-anonymity on the chosen quasi-identifier set meets your policy threshold **with no
+      `accepted_risk` waiver in `config/deid_rules.yaml`**. The gate is hard, but it is
+      waivable, and the shipped demo ships waived (`accepted_by: "UNSIGNED"`). A run that
+      reports `PASSED_WITH_ACCEPTED_RISK` has **not** met the threshold — it has recorded that
+      someone accepted missing it. Before real PHI: generalize further, suppress the residual
+      tail (`suppress_quasi_identifiers_spark`), or have a named, dated, in-scope signer.
 - [ ] `bandit`, `pip-audit`, and `gitleaks` are green in CI.
 
 ## E. Operational gate

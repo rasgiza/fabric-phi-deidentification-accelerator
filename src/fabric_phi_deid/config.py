@@ -29,6 +29,7 @@ from typing import Any
 
 __all__ = [
     "STRATEGY_SPECS",
+    "PRIVACY_GATE_SPECS",
     "ConfigValidationError",
     "CoverageReport",
     "validate_config",
@@ -59,6 +60,19 @@ STRATEGY_SPECS: dict[str, dict[str, Any]] = {
         },
     },
 }
+
+
+# Disclosure-risk gates the scorecard enforces, and the parameter each one is measured against.
+# ``threshold`` names the key holding the numeric bound; ``bound`` says which direction passes.
+PRIVACY_GATE_SPECS: dict[str, dict[str, Any]] = {
+    "k_anonymity": {"threshold": "k", "type": int, "minimum": 1},
+    "l_diversity": {"threshold": "l", "type": int, "minimum": 1},
+    "t_closeness": {"threshold": "t", "type": float, "minimum": 0.0, "maximum": 1.0},
+}
+
+# Every field a recorded risk acceptance must carry. Each one answers a question an auditor
+# will ask: what was accepted, by whom, over what, and until when.
+ACCEPTANCE_FIELDS = ("reason", "accepted_by", "applies_to", "expires_utc")
 
 
 class ConfigValidationError(ValueError):
@@ -112,6 +126,67 @@ def _validate_column_rule(
             )
 
 
+def _validate_privacy_gates(cfg: dict, errors: list[str]) -> None:
+    """Validate the optional ``privacy_gates`` block.
+
+    The block is optional, but a *malformed* one is worse than an absent one: it looks like a
+    configured control while enforcing nothing. So anything present must be well-formed.
+    """
+    gates = cfg.get("privacy_gates")
+    if gates is None:
+        return
+    if not isinstance(gates, dict):
+        errors.append("privacy_gates: must be a mapping.")
+        return
+
+    for control, gate in gates.items():
+        where = f"privacy_gates.{control}"
+        spec = PRIVACY_GATE_SPECS.get(control)
+        if spec is None:
+            errors.append(f"{where}: unknown gate. Valid: {sorted(PRIVACY_GATE_SPECS)}.")
+            continue
+        if not isinstance(gate, dict):
+            errors.append(f"{where}: must be a mapping.")
+            continue
+
+        key = spec["threshold"]
+        if key not in gate:
+            errors.append(f"{where}: missing required threshold key {key!r}.")
+        else:
+            value = gate[key]
+            if isinstance(value, bool) or not isinstance(value, int | float):
+                errors.append(f"{where}.{key}: must be a number, got {type(value).__name__}.")
+            else:
+                if value < spec["minimum"]:
+                    errors.append(f"{where}.{key}: must be >= {spec['minimum']}, got {value}.")
+                if "maximum" in spec and value > spec["maximum"]:
+                    errors.append(f"{where}.{key}: must be <= {spec['maximum']}, got {value}.")
+
+        qis = gate.get("quasi_identifiers")
+        if qis is not None and (
+            not isinstance(qis, list) or not all(isinstance(c, str) for c in qis)
+        ):
+            errors.append(f"{where}.quasi_identifiers: must be a list of column names.")
+
+        sensitive = gate.get("sensitive_attribute")
+        if sensitive is not None and not isinstance(sensitive, str):
+            errors.append(f"{where}.sensitive_attribute: must be a column name.")
+
+        accepted = gate.get("accepted_risk")
+        if accepted is None:
+            continue
+        if not isinstance(accepted, dict):
+            errors.append(f"{where}.accepted_risk: must be a mapping (or omitted entirely).")
+            continue
+        for req in ACCEPTANCE_FIELDS:
+            value = accepted.get(req)
+            if not isinstance(value, str) or not value.strip():
+                errors.append(
+                    f"{where}.accepted_risk.{req}: required, and must be a non-empty string. "
+                    "An acceptance without it is not an audit record."
+                )
+
+
 def validate_config(cfg: Any) -> list[str]:
     """Return a list of validation errors for a loaded config (empty list == valid)."""
     errors: list[str] = []
@@ -150,6 +225,8 @@ def validate_config(cfg: Any) -> list[str]:
                 continue
             for column, rule in table_rules.items():
                 _validate_column_rule(profile, table, column, rule, errors)
+
+    _validate_privacy_gates(cfg, errors)
 
     return errors
 

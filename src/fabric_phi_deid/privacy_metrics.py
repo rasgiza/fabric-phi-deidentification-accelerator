@@ -43,12 +43,15 @@ __all__ = [
     "LDiversityReport",
     "TClosenessReport",
     "SuppressionReport",
+    "CellSuppressionReport",
     "measure_k_anonymity",
     "measure_l_diversity",
     "measure_t_closeness",
     "enforce_k_anonymity",
+    "suppression_cutoff",
     "measure_k_anonymity_spark",
     "enforce_k_anonymity_spark",
+    "suppress_quasi_identifiers_spark",
 ]
 
 
@@ -452,3 +455,108 @@ def enforce_k_anonymity_spark(df, quasi_identifiers: Sequence[str], k: int):
     window = Window.partitionBy(*[F.col(c) for c in quasi_identifiers])
     counted = df.withColumn("_eqclass_size", F.count(F.lit(1)).over(window))
     return counted.filter(F.col("_eqclass_size") >= k).drop("_eqclass_size")
+
+
+@dataclass
+class CellSuppressionReport:
+    """Outcome of k-anonymity enforcement by **local (cell) suppression**.
+
+    Unlike :class:`SuppressionReport`, no rows are removed: the row count is identical before
+    and after. Only the quasi-identifier *values* of the offending rows are blanked.
+    """
+
+    quasi_identifiers: list[str]
+    k: int
+    cutoff: int
+    num_records: int
+    suppressed_records: int
+    achieved_k: int
+
+    @property
+    def suppression_rate(self) -> float:
+        return self.suppressed_records / self.num_records if self.num_records else 0.0
+
+    def summary(self) -> str:
+        return (
+            f"[k-anon cell-suppression k>={self.k}] blanked the quasi-identifiers of "
+            f"{self.suppressed_records}/{self.num_records} rows ({self.suppression_rate:.1%}) "
+            f"at class-size cutoff {self.cutoff}; achieved k={self.achieved_k}"
+        )
+
+
+def suppression_cutoff(histogram: Mapping[int, int], k: int) -> int:
+    """Smallest class-size cutoff that makes local suppression actually reach ``k``.
+
+    Blanking the quasi-identifiers of every row in a class below ``k`` collapses those rows
+    into a *single* new equivalence class (all-NULL quasi-identifiers). If that pool is itself
+    smaller than ``k``, the "fix" has invented a new violation — a k=3 class of exactly the
+    people who were most identifiable. So the cutoff is raised until the suppressed pool is
+    either empty or at least ``k`` strong.
+
+    ``histogram`` maps class size -> number of classes at that size. Pure arithmetic on the
+    driver; no data access.
+    """
+    if k < 1:
+        raise ValueError(f"k must be >= 1, got {k}.")
+    sizes = sorted(histogram)
+    pool = sum(size * histogram[size] for size in sizes if size < k)
+    if pool == 0 or pool >= k:
+        return k
+    # The residual pool would itself be a sub-k class. Absorb the next-smallest classes until
+    # it clears the floor.
+    for size in sizes:
+        if size < k:
+            continue
+        pool += size * histogram[size]
+        if pool >= k:
+            return size + 1
+    # Every class absorbed and still short: the whole table is smaller than k.
+    return (max(sizes) + 1) if sizes else k
+
+
+def suppress_quasi_identifiers_spark(
+    df,
+    quasi_identifiers: Sequence[str],
+    k: int,
+):
+    """Enforce a k floor by blanking quasi-identifiers, **keeping every row**.
+
+    Why not row suppression? In a star schema the patient dimension is referenced by every fact
+    table. Dropping the rows in small equivalence classes (what :func:`enforce_k_anonymity_spark`
+    does) would orphan their facts and silently change every measure in the model. Blanking the
+    quasi-identifier *cells* removes the re-identification handle while leaving the surrogate key
+    — and therefore the joins and the counts — intact. This is standard statistical-disclosure-
+    control practice, and it is the variant that a dimensional model can actually adopt.
+
+    Returns ``(dataframe, CellSuppressionReport)``.
+    """
+    if k < 1:
+        raise ValueError(f"k must be >= 1, got {k}.")
+    from pyspark.sql import Window  # type: ignore
+    from pyspark.sql import functions as F  # type: ignore
+
+    quasi_identifiers = list(quasi_identifiers)
+    before = measure_k_anonymity_spark(df, quasi_identifiers, k=k)
+    cutoff = suppression_cutoff(before.class_size_histogram, k)
+
+    window = Window.partitionBy(*[F.col(c) for c in quasi_identifiers])
+    counted = df.withColumn("_eqclass_size", F.count(F.lit(1)).over(window))
+    small = F.col("_eqclass_size") < cutoff
+    out = counted
+    for col in quasi_identifiers:
+        out = out.withColumn(col, F.when(small, F.lit(None)).otherwise(F.col(col)))
+    out = out.drop("_eqclass_size")
+
+    suppressed = sum(size * n for size, n in before.class_size_histogram.items() if size < cutoff)
+    retained = {size: n for size, n in before.class_size_histogram.items() if size >= cutoff}
+    achieved = min([*retained, suppressed] if suppressed else list(retained) or [0])
+
+    report = CellSuppressionReport(
+        quasi_identifiers=quasi_identifiers,
+        k=k,
+        cutoff=cutoff,
+        num_records=before.num_records,
+        suppressed_records=suppressed,
+        achieved_k=achieved,
+    )
+    return out, report

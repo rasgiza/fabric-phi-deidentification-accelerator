@@ -86,10 +86,20 @@ Every run is auditable — the accelerator does not just transform data, it **pr
 
 - **Direct-identifier gates (hard fail):** no SSN / phone / email patterns, MRN fully
   tokenized, no raw date-of-birth, ZIP ≤ 3 digits. Any failure raises and blocks Gold.
-- **Residual re-identification risk (advisory metrics):** `NB_scorecard` computes
+- **Residual re-identification risk (hard fail, waivable):** `NB_scorecard` measures
   **k-anonymity, l-diversity, and t-closeness** over the quasi-identifier set
   (`BirthYear, Gender, Race, ZIP`) via [`privacy_metrics.py`](src/fabric_phi_deid/privacy_metrics.py)
-  — so you get quantified disclosure risk, not just "the identifiers are gone."
+  and **blocks the run** if a threshold is missed. Re-identification risk is the thing this
+  accelerator exists to manage, so it is not left as a statistic you can ignore.
+  A failing gate has exactly two outcomes: **fix it** (generalize further, or suppress the
+  residual tail with `suppress_quasi_identifiers_spark`) or **sign for it** — record a
+  `accepted_risk` block in [`deid_rules.yaml`](config/deid_rules.yaml) naming a person, a
+  scope, and an expiry date. A waived run reports `PASSED_WITH_ACCEPTED_RISK`, never `PASSED`,
+  and prints the signer in the evidence artifact. An expired, blank, or placeholder acceptance
+  fails closed.
+  > The **shipped demo ships waived** (`accepted_by: "UNSIGNED"`), because k=1 is arithmetically
+  > unavoidable when you publish birth year and 3-digit ZIP at patient grain. That is the point:
+  > you see the real number, and you see that someone has to own it.
 - **Determination governance:** the de-id method, reviewer, and review-by (expiry) date are
   recorded, so an expired Expert Determination is flagged before real PHI is processed.
 - **PHI-free evidence artifact:** each run writes a metadata-only
@@ -150,8 +160,8 @@ builds the Caboodle-only star.
 ## Free-text PHI and detector quality
 
 Structured columns are only half the problem — PHI also hides *inside* free-text (clinical
-notes, reason-for-visit, comments). The accelerator detects and removes it, and — critically —
-**measures how well it does so**:
+notes, reason-for-visit, comments). The accelerator detects and removes it, and is explicit
+about **what it has and has not proven** about how well it does so:
 
 - **Detection + redaction** — [`ner_text.py`](src/fabric_phi_deid/ner_text.py) uses
   **Microsoft Presidio** (NER for PERSON / LOCATION / DATE_TIME / SSN / phone / email /
@@ -162,21 +172,29 @@ notes, reason-for-visit, comments). The accelerator detects and removes it, and 
   exercises this for real: `FactEncounter.ReasonForVisitNote` carries synthetic clinical notes
   and is de-identified by the `redact_text` rule in
   [`deid_rules.yaml`](config/deid_rules.yaml) on every Silver run.
-- **Detector quality (recall / precision / F1)** —
-  [`eval_harness.py`](src/fabric_phi_deid/eval_harness.py) scores detectors against a
+- **Structured-identifier coverage (a hard gate)** —
+  [`eval_harness.py`](src/fabric_phi_deid/eval_harness.py) scores the detector against the
   **shipped synthetic labeled corpus** ([`eval_fixtures.py`](src/fabric_phi_deid/eval_fixtures.py))
   at value level (`evaluate_sets` / `evaluate_flags`) and span level (`evaluate_spans`,
-  overlap-based). `NB_scorecard` runs this every time and writes an **actual recall number** for
-  the run into the evidence artifact — so the free-text claim is a *measured metric*, not "it
-  looks clean." Recall is the metric that matters for de-id: a missed identifier is a leak.
+  overlap-based). `NB_scorecard` **fails the run** if the detector misses any *structured*
+  identifier — SSN, phone, email, card, IP, URL, MRN. These are exact-form patterns, so the
+  regex backend either matches them or it is broken, and a miss is a defect rather than a
+  model-quality question.
+- **Recall is deliberately `NOT_EVALUATED`** — and the scorecard says so in writing. The
+  shipped fixtures were authored alongside the detector, so scoring against them measures
+  *self-consistency*, not recall; publishing that ratio as "recall" would overstate what is
+  known. A defensible figure needs an external annotated corpus (i2b2 / n2c2), which is
+  licensed and not redistributable. **If you need a recall number, benchmark it yourself on
+  your own annotated notes** — see [`eval_harness.py`](src/fabric_phi_deid/eval_harness.py).
 
 > Free-text detection is probabilistic. Treat a `[regex-fallback]` posture as
-> **detection-incomplete** — install the `nlp` extra for real notes; the scorecard publishes the
-> run's recall (advisory, never a hard gate).
+> **detection-incomplete**: it catches structured identifiers and *does not* catch contextual
+> ones (names, places, dates). Install the `nlp` extra for real notes — and note that even then
+> the accelerator reports no recall figure it has not earned.
 
 > **When to use something else.** For **free-text- or LLM-prompt-only** redaction (scrub a
 > document or an outbound LLM call), a dedicated text tool such as
-> [Microsoft Presidio](https://github.com/microsoft/presidio) is the mature choice — and this
+> [Microsoft Presidio](https://github.com/data-privacy-stack/presidio) is the mature choice — and this
 > accelerator *uses* Presidio under the hood rather than reinventing it. This project is for the
 > problem those tools don't solve: **de-identifying structured PHI across a Fabric medallion
 > lakehouse** (Bronze → Silver → Gold) in-tenant, with governance, physical de-id, and

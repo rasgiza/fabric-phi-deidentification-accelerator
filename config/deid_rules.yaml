@@ -28,6 +28,78 @@
 
 active_profile: safe_harbor
 
+# =====================================================================================
+# PRIVACY GATES — disclosure-risk controls the scorecard ENFORCES (not just reports).
+#
+# These three metrics quantify re-identification risk on the published gold layer. They
+# are hard gates: if a threshold is not met and no acceptance is recorded below, the
+# scorecard FAILS the run. That is deliberate. Re-identification risk is the thing this
+# accelerator exists to manage, and a control that cannot fail is not a control.
+#
+# WHY AN ACCEPTANCE BLOCK EXISTS
+# ------------------------------
+# Some of these thresholds are unreachable on some datasets, and no amount of code fixes
+# that. A patient-grain table publishing birth year and 3-digit ZIP has a quasi-identifier
+# domain of ~91 x 4 x 8 x 239 = ~700k cells. Spread 50,200 patients over that and k=1 is
+# arithmetic, not a bug. Measured on this repo's synthetic estate:
+#
+#   BirthYear + Gender + Race + ZIP3   -> 96.9% of rows sit in classes below k=5
+#   10-year band + Gender + Race + ZIP3 -> 40.5%
+#   AgeBand + Gender + Race + ZIP1      ->  0.6%   <-- and STILL k=1
+#
+# Generalization alone never reaches a k floor; there is always a tail. Real deployments
+# close it with suppress_quasi_identifiers_spark(), which blanks the quasi-identifiers of
+# the residual rows while KEEPING the rows, so facts in the star schema do not orphan.
+#
+# Your three honest options when a gate fails:
+#   1. Generalize further      (coarser bands / ZIP1) -- costs analytic resolution
+#   2. Suppress the tail       (suppress_quasi_identifiers_spark) -- costs a few % of cells
+#   3. Accept the residual risk -- costs a signature, below, and only until it expires
+#
+# Option 3 is legitimate. Accepting it SILENTLY is not, which is why every field is
+# required and an unedited placeholder fails the gate closed.
+# =====================================================================================
+privacy_gates:
+
+  k_anonymity:
+    quasi_identifiers: [BirthYear, Gender, Race, ZIP]
+    k: 5
+    # This repo ships against Tonic.ai-generated synthetic records. There is no real person
+    # behind any equivalence class, so the residual risk is accepted for the demo estate and
+    # ONLY for it. Point this pipeline at real PHI and `applies_to` is a statement a reviewer
+    # can see is false -- delete this block and satisfy the gate for real.
+    accepted_risk:
+      reason: >-
+        Synthetic demo estate: k=1 is inherent to publishing birth year and 3-digit ZIP at
+        patient grain, and no individual is represented in this data. Accepted for the demo
+        only; a real deployment must generalize, suppress the tail, or re-sign this.
+      accepted_by: "UNSIGNED — repository default, replace before any real-PHI use"
+      applies_to: "synthetic demo estate (Tonic.ai generated), 50,200 patients — NOT real PHI"
+      expires_utc: "2027-08-05T00:00:00+00:00"
+
+  l_diversity:
+    sensitive_attribute: Ethnicity
+    l: 2
+    accepted_risk:
+      reason: >-
+        Synthetic demo estate: with k=1 on the quasi-identifiers, every equivalence class is
+        a single row, so l=1 follows mechanically. Accepted for the demo only.
+      accepted_by: "UNSIGNED — repository default, replace before any real-PHI use"
+      applies_to: "synthetic demo estate (Tonic.ai generated), 50,200 patients — NOT real PHI"
+      expires_utc: "2027-08-05T00:00:00+00:00"
+
+  t_closeness:
+    sensitive_attribute: Ethnicity
+    t: 0.2
+    accepted_risk:
+      reason: >-
+        Synthetic demo estate: singleton equivalence classes make the per-class Ethnicity
+        distribution maximally distant from the global one by construction. Demo only.
+      accepted_by: "UNSIGNED — repository default, replace before any real-PHI use"
+      applies_to: "synthetic demo estate (Tonic.ai generated), 50,200 patients — NOT real PHI"
+      expires_utc: "2027-08-05T00:00:00+00:00"
+
+
 profiles:
 
   # -----------------------------------------------------------------------------------
