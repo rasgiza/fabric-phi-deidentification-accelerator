@@ -376,7 +376,11 @@ def redact_text_column(
     try:
         import pandas as pd  # type: ignore  # noqa: F401
 
-        @F.pandas_udf(T.StringType())
+        # pyspark's stubs type the first positional argument of `pandas_udf` as the wrapped
+        # function, so they do not model the documented `@pandas_udf(<returnType>)` decorator
+        # form. The call is correct at runtime; only the stub overloads are incomplete. The
+        # ignore below is narrowed to that one error code so any *other* error still surfaces.
+        @F.pandas_udf(T.StringType())  # type: ignore[call-overload]
         def _redact_udf(col: pd.Series) -> pd.Series:  # type: ignore
             import pandas as _pd  # type: ignore
 
