@@ -69,7 +69,8 @@ def test_no_projected_column_is_suppressed(cfg, profile):
 
 @pytest.mark.parametrize("profile", PROFILES)
 @pytest.mark.parametrize(
-    "column", ["HOME_PHONE", "EMAIL_ADDRESS", "ADD_LINE_1", "CITY", "PAT_FIRST_NAME", "PAT_LAST_NAME"]
+    "column",
+    ["HOME_PHONE", "EMAIL_ADDRESS", "ADD_LINE_1", "CITY", "PAT_FIRST_NAME", "PAT_LAST_NAME"],
 )
 def test_clarity_direct_identifiers_never_reach_the_patient_dimension(cfg, profile, column):
     """Belt-and-braces: these must be absent from the projection, not merely suppressed.
@@ -115,9 +116,7 @@ def test_same_mrn_yields_one_conformed_patient_key(cfg, pepper, profile):
     """
     mrn = "MRN0000451"
     _, cab_params = resolve_column_strategy(cfg, profile, "dim_patient", gc.CABOODLE_MRN_COLUMN)
-    _, clr_params = resolve_column_strategy(
-        cfg, profile, "clarity_patient", gc.CLARITY_MRN_COLUMN
-    )
+    _, clr_params = resolve_column_strategy(cfg, profile, "clarity_patient", gc.CLARITY_MRN_COLUMN)
     caboodle_token = apply_strategy(mrn, "tokenize", cab_params, pepper=pepper)
     clarity_token = apply_strategy(mrn, "tokenize", clr_params, pepper=pepper)
     assert caboodle_token == clarity_token
@@ -138,7 +137,9 @@ def test_clarity_facts_link_through_a_consistently_tokenized_patient_id(cfg, pro
     for name, spec in gc.CLARITY_GOLD.items():
         if spec.patient_link is None:
             continue
-        assert spec.patient_link in spec.projected_columns, f"{name} declares a link it never projects"
+        assert spec.patient_link in spec.projected_columns, (
+            f"{name} declares a link it never projects"
+        )
         strategy, params = resolve_column_strategy(cfg, profile, spec.source, spec.patient_link)
         assert strategy == "tokenize", f"{name}.{spec.patient_link} must be tokenized"
         assert params.get("namespace") == patient_params.get("namespace"), (

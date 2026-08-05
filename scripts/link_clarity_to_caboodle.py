@@ -64,13 +64,17 @@ def plan_assignment() -> tuple[list[str | None], int]:
     clarity_count = len(_read_column(CLARITY_PATIENTS, "PAT_MRN_ID"))
 
     link_count = int(round(clarity_count * LINK_FRACTION))
-    rng = random.Random(SEED)
+    # Not cryptographic: this shapes a synthetic fixture and MUST be reproducible, which
+    # is the opposite of what secrets.SystemRandom provides.
+    rng = random.Random(SEED)  # noqa: S311
     # Sample WITHOUT replacement: a Caboodle patient is claimed by at most one Clarity row.
     borrowed = rng.sample(sorted(set(caboodle_mrns)), link_count)
     linked_rows = set(rng.sample(range(clarity_count), link_count))
 
     assignment: list[str | None] = [None] * clarity_count
-    for mrn, row in zip(borrowed, sorted(linked_rows)):
+    # strict=True: the two sequences are built from the same link_count, so a length
+    # mismatch means the sampling logic broke and some rows would silently go unlinked.
+    for mrn, row in zip(borrowed, sorted(linked_rows), strict=True):
         assignment[row] = mrn
     return assignment, clarity_count
 
@@ -113,8 +117,9 @@ def report() -> int:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--check", action="store_true",
-                        help="report the current overlap without modifying any file")
+    parser.add_argument(
+        "--check", action="store_true", help="report the current overlap without modifying any file"
+    )
     args = parser.parse_args()
 
     if not args.check:

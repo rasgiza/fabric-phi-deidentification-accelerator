@@ -42,6 +42,7 @@ import hmac
 import os
 import re
 import string
+from typing import overload
 
 __all__ = [
     "tokenize",
@@ -80,6 +81,16 @@ MIN_PEPPER_LENGTH = 32
 # only removed when the caller asks for it (see normalize_identifier).
 _WHITESPACE_RE = re.compile(r"\s+")
 _SEPARATOR_RE = re.compile(r"[^A-Z0-9]")
+
+
+# Overloads keep the None-passthrough convenience without forcing every caller that
+# already holds a `str` to re-narrow the result.
+@overload
+def normalize_identifier(value: str, *, strip_separators: bool = False) -> str: ...
+
+
+@overload
+def normalize_identifier(value: None, *, strip_separators: bool = False) -> None: ...
 
 
 def normalize_identifier(value: str | None, *, strip_separators: bool = False) -> str | None:

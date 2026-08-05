@@ -30,9 +30,9 @@ PEPPER = "test-pepper-that-is-long-enough-to-pass-validation"
 @pytest.mark.parametrize(
     "caboodle_value, clarity_value",
     [
-        ("MRN00001234", "mrn00001234"),        # case
-        ("MRN00001234", "  MRN00001234  "),    # padding
-        ("MRN00001234", "MRN00001234\n"),      # trailing newline from a CSV export
+        ("MRN00001234", "mrn00001234"),  # case
+        ("MRN00001234", "  MRN00001234  "),  # padding
+        ("MRN00001234", "MRN00001234\n"),  # trailing newline from a CSV export
     ],
 )
 def test_cosmetic_differences_tokenize_identically(caboodle_value, clarity_value):
@@ -65,9 +65,9 @@ def test_strip_separators_is_opt_in():
 def test_normalization_does_not_merge_distinct_identifiers():
     """Under-normalizing costs a match; over-normalizing merges two patients. Assert the
     normalizations we deliberately did NOT implement stay unimplemented."""
-    assert tokenize("00001234", PEPPER) != tokenize("1234", PEPPER)      # leading zeros
-    assert tokenize("MRN1234", PEPPER) != tokenize("1234", PEPPER)       # prefix
-    assert tokenize("E1234", PEPPER) != tokenize("H1234", PEPPER)        # assigning authority
+    assert tokenize("00001234", PEPPER) != tokenize("1234", PEPPER)  # leading zeros
+    assert tokenize("MRN1234", PEPPER) != tokenize("1234", PEPPER)  # prefix
+    assert tokenize("E1234", PEPPER) != tokenize("H1234", PEPPER)  # assigning authority
 
 
 @pytest.mark.parametrize("blank", [None, "", "   ", "\t", "\n"])
@@ -84,9 +84,7 @@ def test_blank_values_are_never_tokenized(blank):
 
 def test_namespaces_still_do_not_collide_after_normalization():
     """Normalization must not weaken the cross-column separation guarantee."""
-    assert tokenize("1234", PEPPER, namespace="mrn") != tokenize(
-        "1234", PEPPER, namespace="npi"
-    )
+    assert tokenize("1234", PEPPER, namespace="mrn") != tokenize("1234", PEPPER, namespace="npi")
 
 
 def test_format_preserving_keeps_shape_but_links_across_case():
@@ -94,8 +92,8 @@ def test_format_preserving_keeps_shape_but_links_across_case():
     upper = tokenize_format_preserving("AB12-3456", PEPPER)
     lower = tokenize_format_preserving("ab12-3456", PEPPER)
     assert upper is not None and lower is not None
-    assert upper != lower                      # casing preserved per character class
-    assert upper.upper() == lower.upper()      # ...but driven by the same digest
+    assert upper != lower  # casing preserved per character class
+    assert upper.upper() == lower.upper()  # ...but driven by the same digest
     assert upper[4] == "-" and lower[4] == "-"  # separator preserved in place
 
 
@@ -117,11 +115,11 @@ def test_healthy_overlap_passes_and_predicts_the_row_counts():
     report = gc.assess_linkage(caboodle_patients=50_000, clarity_patients=1_000, matched=800)
     assert report.status == "ok"
     assert report.linkage_rate == pytest.approx(0.80)
-    assert report.matched == 800            # SourceSystem='Both'
-    assert report.caboodle_only == 49_200   # SourceSystem='Caboodle'
-    assert report.clarity_only == 200       # SourceSystem='Clarity'
+    assert report.matched == 800  # SourceSystem='Both'
+    assert report.caboodle_only == 49_200  # SourceSystem='Caboodle'
+    assert report.clarity_only == 200  # SourceSystem='Clarity'
     assert report.conformed_rows == 50_200  # the union, not the 51,000 sum
-    report.raise_if_implausible()           # must not raise
+    report.raise_if_implausible()  # must not raise
 
 
 def test_rate_is_scored_against_the_smaller_cohort():
