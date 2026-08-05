@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-08-05
+
+A compliance-correctness release. Several controls that were **advisory** are now **gating**, and
+two documented claims that were false have been corrected. Runs that passed under `0.1.0` can fail
+under `0.2.0` — that is the point of the release, not a regression. Anyone pinned to `v0.1.0` is
+running code with the defects listed below and should upgrade.
+
 ### Changed
 - **The published demo pepper is now refused rather than trusted.** `02b_silver_deid` and
   `NB_reidentify` ship a committed `DEMO_PEPPER` literal so the synthetic demo runs without Key
