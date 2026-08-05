@@ -7,6 +7,49 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Added
+- **All 17 gold tables are now in the semantic model.** The seven `gold_safe_*_clarity_*`
+  tables were being built and published on every run and were invisible in Power BI: the
+  TMDL in `reports/` was hand-authored and nothing tied it back to the star declaration,
+  so half the accelerator's output had no way to reach a report. Nothing failed — the
+  notebooks were green, the tables were there, the report just quietly showed the Caboodle
+  half.
+  - Every Clarity fact joins `gold_safe_dim_patient[PatientKey]` — the *same* dimension the
+    Caboodle facts use — so one patient is one row regardless of how many systems they
+    appear in, and any fact can be sliced by `SourceSystem`.
+  - Clarity's `DEPARTMENT_ID` and `PAT_ENC_CSN_ID` are deliberately **not** related to the
+    Caboodle dimensions: those are different key spaces that merely describe similar things,
+    and joining them would fabricate conformance the extracts do not have. For the same
+    reason `fact_clarity_result` is not related to `fact_clarity_order_proc` — a fact-to-fact
+    relationship lets filters cross grains and double-count.
+  - `gold_safe_dim_patient` gained the `ClarityPatientID` column it has been publishing all
+    along, plus **Patients**, **Patients in Both Systems** and **Cross-Source Match %**
+    measures. The second is a *subset* of the first, never an addition — matched patients
+    are one row, not two.
+  - All 12 new relationships were verified against live data: zero orphan keys, zero nulls,
+    unique keys on both dimension sides.
+- **`scripts/generate_clarity_semantic_tables.py`** renders the Clarity half of the model
+  from `gold_conform.CLARITY_GOLD`, the same declaration the notebooks build from, so the
+  model can no longer drift from the tables it binds. `lineageTag` GUIDs are derived with
+  `uuid5` rather than randomly, so regenerating produces no spurious diff and does not break
+  report bindings. `tests/test_semantic_model.py` fails the build on drift — adding a gold
+  table without regenerating is now a red CI run rather than a silently incomplete model.
+- **`NB_cleanup_gold` is implemented** (it shipped as an empty placeholder). It reconciles
+  the `gold_safe_*` tables that exist against the ones `GOLD_TABLES` declares and drops the
+  difference. The point is not tidiness: this accelerator's privacy guarantees are per-run
+  and per-table, so a table left behind by an earlier configuration is one that nothing
+  rewrote and therefore nothing re-scanned — produced under whatever rulebook was active at
+  the time, still bound by the semantic model, still queryable through the SQL endpoint, and
+  looking exactly as trustworthy as a current table. Orphans appear routinely and quietly
+  whenever an adopter drops a source, renames a table, or trims the declaration.
+  - Deny-by-default: `CONFIRM = False` prints the plan and drops nothing. `MODE` selects
+    orphans-only (routine) or a full teardown (after a schema change).
+  - Hard-scoped to the `gold_safe_` prefix with an explicit refusal if a target ever falls
+    outside it, so it cannot reach bronze, silver, or the identified gold star.
+  - `MODE`/`CONFIRM` are a Fabric parameters cell, so a pipeline can run it on a schedule in
+    report-only mode and alert on orphans without permission to drop anything.
+  - Both paths verified in Fabric against a planted orphan: the dry run left all 18 tables
+    intact; the confirmed run dropped exactly the orphan and left all 17 declared tables.
+
 - **Clarity is now conformed into the Gold star** (`03b_gold_safe` and its Analytics twin),
   closing the gap where Clarity was de-identified and governed but never reached Power BI:
   - `gold_safe_dim_patient` becomes a **conformed dimension**. The two schemas are matched on

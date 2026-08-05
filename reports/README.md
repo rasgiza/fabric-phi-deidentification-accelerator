@@ -43,6 +43,55 @@ Source = Sql.Database("REPLACE_WITH_YOUR_SQL_ENDPOINT.datawarehouse.fabric.micro
 The model's tables are already named `gold_safe_dim_*` / `gold_safe_fact_*` to match the
 output of notebook `03b_gold_safe_analytics`, so no table remapping is needed.
 
+## What's in the model
+
+All **17** gold tables are bound, in two halves that meet at one shared dimension:
+
+| Half | Tables | Grain |
+|------|--------|-------|
+| **Caboodle** (dimensional) | `dim_provider`, `dim_department`, `dim_facility`, `dim_payer`, `dim_diagnosis`, `dim_procedure`, `fact_encounter`, `fact_claim`, `fact_risk_score` | surrogate-key star |
+| **Clarity** (transactional) | `dim_clarity_provider`, `fact_clarity_encounter`, `fact_clarity_admission`, `fact_clarity_diagnosis`, `fact_clarity_order_med`, `fact_clarity_order_proc`, `fact_clarity_result` | Epic-native IDs |
+| **Shared** | `dim_patient` | one row per person, across both |
+
+**Patient is the only conformed dimension** — and that is deliberate. Every Clarity fact
+joins `gold_safe_dim_patient[PatientKey]`, the same dimension the Caboodle facts use, so
+one patient is one row no matter how many systems they appear in. Slice any fact by
+`dim_patient[SourceSystem]` (`Caboodle` / `Clarity` / `Both`) and the counts reconcile.
+
+What is deliberately **not** joined:
+
+- **Clarity `DEPARTMENT_ID` → `dim_department`.** Different key spaces that happen to
+  describe similar things. Relating them would fabricate conformance the extracts do not
+  have and produce joins that look right and are wrong.
+- **Clarity `PAT_ENC_CSN_ID` → `fact_encounter`.** Same reason; the two sources do not
+  share an encounter identifier.
+- **`fact_clarity_result` → `fact_clarity_order_proc`.** Fact-to-fact relationships let
+  filters cross grains and double-count. Conform through the shared dimension instead.
+
+Three measures on `dim_patient` surface the cross-source claim directly: **Patients**,
+**Patients in Both Systems**, and **Cross-Source Match %**. The second is a *subset* of
+the first, never an addition to it — matched patients are one row, not two. If
+**Patients in Both Systems** reads 0, the cross-source join silently failed; `03b`
+asserts the same match rate at build time and will stop before publishing.
+
+## Changing the model
+
+The Clarity half is **generated** from `gold_conform.CLARITY_GOLD` — the same declaration
+the notebooks build from — so the model cannot drift from the tables it binds:
+
+```bash
+python scripts/generate_clarity_semantic_tables.py           # regenerate
+python scripts/generate_clarity_semantic_tables.py --check   # CI: fail on drift
+```
+
+`tests/test_semantic_model.py` enforces this. Add a gold table without regenerating, and
+the build fails instead of shipping a model that quietly omits a fact table — which is
+exactly how the seven Clarity tables came to be published to the lakehouse and invisible
+in Power BI. `lineageTag` GUIDs are derived deterministically, so regenerating produces no
+spurious diff and does not break report bindings.
+
+The Caboodle half is hand-authored and edited directly.
+
 ## Open / deploy
 
 **Power BI Desktop (recommended):** open `After PHI Deidentified.pbip`. The report loads

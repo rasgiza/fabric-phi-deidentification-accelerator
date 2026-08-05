@@ -259,10 +259,11 @@ fabric-phi-deid-accelerator/
     03b_gold_safe.ipynb         ← PHI-free star schema → gold_safe_*
     NB_reidentify.ipynb         ← RESTRICTED: token → original value (Vault workspace, ~2 people)
     NB_scorecard.ipynb          ← compliance: 0/18 identifiers + k-anon/l-div/t-closeness + evidence JSON
+    NB_cleanup_gold.ipynb       ← housekeeping: drops gold_safe_* tables the config no longer declares
   sql/
     rls_cls_policies.sql        ← OneLake / Warehouse RLS + CLS (defense-in-depth demo)
   reports/
-    Gold Safe Analytics.SemanticModel/  ← committed Direct Lake model over gold_safe_* (TMDL)
+    Gold Safe Analytics.SemanticModel/  ← committed Direct Lake model over all 17 gold_safe_* tables (TMDL)
     After PHI Deidentified.pbip         ← safe report (byPath to the model — self-contained)
     Before PHI Exposed.pbip / PHI Toggle Demo.pbip  ← unsafe "before" baseline (rebind to your gold_*)
     README.md                   ← rebind steps + which names are examples
@@ -280,7 +281,10 @@ fabric-phi-deid-accelerator/
     demo_runbook.md             ← 5-act demo with 1 admin + 2 user accounts
     pepper_rotation_runbook.md  ← generate / store / rotate the Key Vault pepper
     pre_real_phi_checklist.md   ← the gates that must be signed off BEFORE any real PHI
-  tests/                        ← core, config-validation, audit, residual-PHI, property, Spark
+  tests/                        ← core, config-validation, audit, residual-PHI, property, Spark, semantic-model drift
+  scripts/
+    link_clarity_to_caboodle.py           ← give the two synthetic extracts a shared patient cohort
+    generate_clarity_semantic_tables.py   ← render the Clarity half of the semantic model from gold_conform
   .github/workflows/ci.yml      ← lint + type + test (3.11/3.12) + security (bandit/pip-audit/gitleaks)
   SECURITY.md  CONTRIBUTING.md  CHANGELOG.md  CODEOWNERS  LICENSE
 ```
