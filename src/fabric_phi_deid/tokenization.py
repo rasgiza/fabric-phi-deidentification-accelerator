@@ -50,8 +50,11 @@ __all__ = [
     "tokenize_format_preserving",
     "normalize_identifier",
     "get_pepper",
+    "is_known_compromised_pepper",
     "KEYVAULT_URL_ENV",
     "PEPPER_ENV",
+    "ALLOW_COMPROMISED_PEPPER_ENV",
+    "COMPROMISED_PEPPER_ACK",
     "DEFAULT_SECRET_NAME",
     "MIN_PEPPER_LENGTH",
 ]
@@ -76,6 +79,46 @@ PEPPER_ENV = "PHI_DEID_PEPPER"  # noqa: S105 - name of an env var, not a secret 
 # peppers is a defense against a misconfigured/placeholder value silently weakening every
 # token in the dataset. Generate with e.g. ``secrets.token_urlsafe(48)``.
 MIN_PEPPER_LENGTH = 32
+
+# --- known-compromised peppers ------------------------------------------------------------
+# Length is a proxy for entropy, and entropy is the WRONG question for a value that has been
+# published. The demo pepper in this repository's notebooks is 64 high-entropy characters, so
+# it sails through every strength check -- and it is printed in a public Git repository, which
+# means every deployment that uses it shares one key that anyone can read. MRNs come from a
+# small, structured space (`MRN00000001`...), so an attacker holding the pepper can simply
+# tokenize the whole space and invert the mapping by lookup. That reduces the tokens from
+# "irreversible without the crosswalk" to "reversible by anyone", which is the single claim
+# this module exists to make.
+#
+# Stored as SHA-256 digests rather than literals so this file never contains a usable pepper
+# and secret scanners have nothing to flag. This is the same pattern as a compromised-credential
+# blocklist: the check is "is this the known-bad value", not "is this value strong".
+_KNOWN_COMPROMISED_PEPPER_SHA256 = frozenset(
+    {
+        # notebooks/02b_silver_deid.ipynb + notebooks/NB_reidentify.ipynb DEMO_PEPPER
+        "14c7fbd7511313ce63c5247a8617e61baefa92c88ad45823e281c55c33955887",
+    }
+)
+
+# Opt-in acknowledgement for the synthetic demo. Deliberately NOT a boolean: `=1` or `=true`
+# is the kind of thing that gets set once in a base image and never reconsidered, whereas
+# writing the words below is a statement about the DATA, which is the thing that actually
+# determines whether a shared pepper is acceptable.
+ALLOW_COMPROMISED_PEPPER_ENV = "PHI_DEID_ALLOW_COMPROMISED_PEPPER"
+COMPROMISED_PEPPER_ACK = "synthetic-data-only"  # noqa: S105 - an acknowledgement phrase
+
+
+def is_known_compromised_pepper(pepper: str | None) -> bool:
+    """Return True if `pepper` is a published value from this repository's demos.
+
+    Compared by digest in constant time. A published pepper is not weak; it is *shared*,
+    which is a different and worse failure mode that no strength check detects.
+    """
+    if not pepper:
+        return False
+    digest = hashlib.sha256(pepper.encode("utf-8")).hexdigest()
+    return any(hmac.compare_digest(digest, known) for known in _KNOWN_COMPROMISED_PEPPER_SHA256)
+
 
 # Internal runs of whitespace collapse to a single space before comparison; separators are
 # only removed when the caller asks for it (see normalize_identifier).
@@ -355,15 +398,36 @@ def get_pepper(
 
 
 def _validate_pepper(pepper: str | None, min_length: int) -> str:
-    """Return `pepper` if it meets the minimum-entropy length bar, else raise.
+    """Return `pepper` if it is usable, else raise.
 
-    Applied to every resolution path so a weak/placeholder value can never silently
-    weaken tokenization regardless of whether it came from an env var or Key Vault.
+    Applied to every resolution path so a weak, placeholder, or *published* value can never
+    silently weaken tokenization regardless of whether it came from an env var or Key Vault.
+
+    Two distinct failures are checked, because they are not the same problem:
+
+    - **Too short** — probably a placeholder; low entropy makes the token guessable.
+    - **Known-compromised** — high entropy, but published in this repository, so every
+      deployment using it shares a key that anyone can read. No strength check catches this.
     """
     if pepper is None or len(pepper) < min_length:
         raise ValueError(
             f"Resolved pepper is too short (< {min_length} chars). A production pepper "
             "must be a high-entropy secret; regenerate with secrets.token_urlsafe(48). "
             "Refusing to tokenize with a weak/placeholder pepper."
+        )
+    if is_known_compromised_pepper(pepper) and (
+        os.environ.get(ALLOW_COMPROMISED_PEPPER_ENV) != COMPROMISED_PEPPER_ACK
+    ):
+        raise ValueError(
+            "Refusing to tokenize with the published demo pepper. This value appears in "
+            "this repository's notebooks, so it is identical across every deployment and "
+            "readable by anyone. Because MRNs come from a small structured space, holding "
+            "the pepper is enough to invert the tokens by brute force -- the data would be "
+            "pseudonymous in name only.\n"
+            "  For REAL data: generate your own with secrets.token_urlsafe(48) and store it "
+            f"in Key Vault (see docs/pepper_rotation_runbook.md); set {KEYVAULT_URL_ENV}.\n"
+            "  For SYNTHETIC data only: set "
+            f'{ALLOW_COMPROMISED_PEPPER_ENV}="{COMPROMISED_PEPPER_ACK}" to acknowledge that '
+            "the tokens in this run are reversible by anyone."
         )
     return pepper

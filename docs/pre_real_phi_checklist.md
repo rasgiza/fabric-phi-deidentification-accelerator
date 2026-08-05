@@ -43,6 +43,12 @@ Do **not** point this pipeline at real PHI until every box is checked and signed
 
 - [ ] Pepper is a fresh high-entropy secret in Key Vault; `PHI_DEID_KEYVAULT_URL` set via
       environment; `get_pepper()` succeeds and the min-length check passes.
+- [ ] The committed `DEMO_PEPPER` cell has been **deleted** from `02b_silver_deid` and
+      `NB_reidentify`, and `PHI_DEID_ALLOW_COMPROMISED_PEPPER` is **not set anywhere** — not in
+      the notebooks, not in the environment, not in a Spark pool configuration. That variable
+      exists only to let the synthetic demo run; with real data its presence means tokens are
+      keyed on a value published on the internet. Confirm `pepper_key_version` in the run
+      manifest does **not** end in `-PUBLISHED-COMPROMISED`.
 - [ ] Key Vault RBAC is least-privilege (de-id identity = Secrets User, read-only).
 - [ ] The **three-workspace isolation** is enforced (Raw / Analytics / Vault) with correct
       role assignments; crosswalk + `NB_reidentify` are **Vault-only**.

@@ -57,7 +57,13 @@ policy (public Key Vaults are blocked by design).
   via `notebookutils.credentials.getSecret` **over a Fabric managed private endpoint** (Option 1).
 - **Demo/synthetic:** read from the `PHI_DEID_PEPPER` environment variable (Option 2) when no
   F-SKU capacity / MPE is available. `get_pepper()` supports both; the length check still applies.
-- **Never** in code, notebook output, tables, logs, or Git.
+- **Never** in code, notebook output, tables, logs, or Git — **with one deliberate exception**:
+  the synthetic demo ships a committed `DEMO_PEPPER` so it runs with no Azure setup. That value is
+  therefore public, shared across every deployment, and adequate only for synthetic data. It is
+  blocklisted by SHA-256 digest and `get_pepper()` refuses it unless the run sets
+  `PHI_DEID_ALLOW_COMPROMISED_PEPPER="synthetic-data-only"`; when used, the run manifest's
+  `pepper_key_version` is suffixed `-PUBLISHED-COMPROMISED`. See
+  [pepper_rotation_runbook.md §1a](pepper_rotation_runbook.md).
 - **Rotation = breach recovery**: rotating the pepper invalidates all tokens; re-run `02b`
   (and rebuild the Vault crosswalk) to re-tokenize everything.
 
@@ -67,6 +73,7 @@ policy (public Key Vaults are blocked by design).
 |--------|------|---------|
 | `display()` / `.show()` of raw df in the de-id notebook | Raw PHI in notebook output/snapshots | HARD RULE + lint check in `tests/` (no display/show/print/collect/toPandas of raw) |
 | `print(PEPPER)` | Secret in output/logs | Only `bool(PEPPER)` is ever printed |
+| Reusing the demo pepper on real data | Shared, published key ⇒ tokens invertible by anyone | `get_pepper()` blocklists it by digest on **both** resolution paths; requires an explicit acknowledgement; stamped into the run manifest |
 | Spark logs echoing rows | PHI in cluster logs | Avoid `.collect()`/`.toPandas()` on raw; process via DataFrame ops/UDFs |
 | Crosswalk copied out of Vault | Re-identification everywhere | Crosswalk exists only in Vault workspace; OneLake security + audit |
 | Admin/Member bypass of masking | Masking ≠ removal | Primary control is de-identification (bytes removed), not masking |

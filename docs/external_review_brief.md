@@ -92,9 +92,12 @@ Listing these so a reviewer does not spend time discovering what we already know
 - **Free-text recall is not benchmarked.** The scorecard hard-gates structured identifiers and
   reports contextual recall as `NOT_EVALUATED`. A defensible figure needs i2b2/n2c2, which is
   licensed and not redistributable.
-- **The demo pepper is a committed literal.** Fine for synthetic data, fatal for real PHI. See
-  [pepper_rotation_runbook.md](pepper_rotation_runbook.md) and
-  [pre_real_phi_checklist.md](pre_real_phi_checklist.md).
+- **The demo pepper is a committed literal.** Fine for synthetic data, fatal for real PHI. It is
+  now blocklisted by digest and refused by `get_pepper()` unless a run sets
+  `PHI_DEID_ALLOW_COMPROMISED_PEPPER="synthetic-data-only"`, and its use is stamped into the run
+  manifest. The residual question for a reviewer is whether that acknowledgement is a control or
+  a formality \u2014 see Q3. Details in [pepper_rotation_runbook.md](pepper_rotation_runbook.md) \u00a71a
+  and [pre_real_phi_checklist.md](pre_real_phi_checklist.md).
 - **HIPAA identifiers (P) biometrics and (Q) photographs are `NOT_EVALUATED`** — the pipeline reads
   structured Delta tables and has no imaging or biometric path.
 - **RLS/CLS policies are written but not applied** in the reference deployment.

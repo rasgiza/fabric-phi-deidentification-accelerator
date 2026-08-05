@@ -378,7 +378,14 @@ output *cross-workspace*, so exactly one physical, PHI-free copy lands in Analyt
 3. Import each notebook into its workspace per the table above (Data Engineering → Import) and
    upload `src/` + `config/` to that workspace's Lakehouse at `Files/accelerator/`.
 4. Provide the tokenization **pepper**:
-   - **Synthetic demo (Option 2):** set the `PHI_DEID_PEPPER` env var — no Azure setup needed.
+   - **Synthetic demo (Option 2):** the demo notebooks already set a committed `DEMO_PEPPER`, so
+     there is nothing to do — but understand what you are agreeing to. That value is published
+     in this repository, so it is the same key in every deployment and anyone can read it. Over
+     an MRN-sized identifier space that is enough to invert the tokens by brute force.
+     `get_pepper()` refuses it unless the run sets
+     `PHI_DEID_ALLOW_COMPROMISED_PEPPER="synthetic-data-only"` (the demo notebooks do), and the
+     run manifest records `pepper_key_version` as `-PUBLISHED-COMPROMISED`. **Synthetic data
+     only.** To use your own instead, set `PHI_DEID_PEPPER` to `secrets.token_urlsafe(48)`.
    - **Production (Option 1):** run
      [`scripts/provision_keyvault.ps1`](scripts/provision_keyvault.ps1) /
      [`scripts/provision_keyvault.sh`](scripts/provision_keyvault.sh) to create the vault,

@@ -7,6 +7,30 @@ All notable changes to this project are documented here. The format is based on
 ## [Unreleased]
 
 ### Changed
+- **The published demo pepper is now refused rather than trusted.** `02b_silver_deid` and
+  `NB_reidentify` ship a committed `DEMO_PEPPER` literal so the synthetic demo runs without Key
+  Vault. It is 64 high-entropy characters, so every strength check passed it — which was exactly
+  the problem. The pepper is not weak, it is **published**: identical in every deployment of this
+  accelerator and readable by anyone with the repository URL. Since MRNs come from a small,
+  structured space, holding the pepper is enough to tokenize the whole space and invert the
+  mapping by lookup, without touching HMAC. Tokens keyed on it are pseudonymous in name only, and
+  nothing in the codebase said so at run time.
+
+  `get_pepper()` now treats it as a **known-compromised credential**: blocklisted by SHA-256
+  digest (so the source file contains no usable pepper, and renaming the variable does not evade
+  the check), enforced on **both** the env-var and Key Vault paths (copying it into Key Vault does
+  not launder it), and raising `ValueError` unless the run sets
+  `PHI_DEID_ALLOW_COMPROMISED_PEPPER="synthetic-data-only"`. The acknowledgement is that exact
+  phrase rather than a boolean, because `=1` gets set once in a base image and never reconsidered,
+  whereas those words are a claim about the data. When the demo pepper is used, the run manifest's
+  `pepper_key_version` is suffixed `-PUBLISHED-COMPROMISED` so the durable audit evidence records
+  it. Verified in Fabric both ways: the run **fails** without the acknowledgement and completes
+  with it.
+
+  Documentation that claimed the pepper "never appears in code, tables, notebook output, or Git"
+  was corrected — for the demo estate that was simply untrue. The launcher's "Pepper: nothing to
+  do" message now explains the exposure instead of reassuring about entropy.
+
 - **Re-identification risk is now a gate, not a statistic.** k-anonymity, l-diversity and
   t-closeness were computed, printed, and then ignored — `NB_scorecard` reported `k=1` on the
   shipped estate and passed anyway, because those checks were advisory. Residual disclosure risk

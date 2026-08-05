@@ -80,7 +80,12 @@ the repo's `src/` and `config/` folders into **each** workspace's Lakehouse at
 `Files/accelerator/`.
 
 ### 4. Provide the tokenization pepper
-- **Synthetic demo (easiest):** set the `PHI_DEID_PEPPER` environment variable — no Azure setup.
+- **Synthetic demo (easiest):** nothing to do — the demo notebooks set a committed `DEMO_PEPPER`
+  and acknowledge it via `PHI_DEID_ALLOW_COMPROMISED_PEPPER="synthetic-data-only"`. That pepper is
+  published in this repository, so tokens produced with it are reversible by anyone who can read
+  it; `get_pepper()` refuses the value without that acknowledgement, and the run manifest flags it
+  `-PUBLISHED-COMPROMISED`. **Synthetic data only.** For your own, set `PHI_DEID_PEPPER` to
+  `secrets.token_urlsafe(48)`.
 - **Production:** run [`scripts/provision_keyvault.ps1`](scripts/provision_keyvault.ps1),
   then set `PHI_DEID_KEYVAULT_URL` to your vault URL. See
   [docs/pepper_rotation_runbook.md](docs/pepper_rotation_runbook.md). Never hardcode it.

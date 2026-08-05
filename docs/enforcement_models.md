@@ -53,7 +53,12 @@ flowchart LR
   privileged crossing point.
 - The **only** place a token becomes an identity again is the Vault crosswalk via
   `NB_reidentify` — audited, ~2 people.
-- The **pepper** never appears in code, tables, notebook output, or Git.
+- The **pepper** never appears in tables or notebook output. In a real deployment it never
+  appears in code or Git either — it is fetched from Key Vault at runtime. **The synthetic
+  demo is the deliberate exception**: it ships a committed `DEMO_PEPPER`, so for the demo
+  estate that guarantee does not hold, and `get_pepper()` refuses to use that value unless
+  the run explicitly acknowledges it. See
+  [pepper_rotation_runbook.md](pepper_rotation_runbook.md) §1a.
 
 ## Strategy → engine matrix
 
