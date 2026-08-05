@@ -6,6 +6,56 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Fixed
+- **The scorecard could certify a compliance claim the rulebook did not support.**
+  `NB_scorecard` hardcoded `DETERMINATION_METHOD = "safe_harbor"` and never checked it
+  against `deid_rules.yaml`. The active profile tokenizes 22 columns — MRN, NPI, DEA,
+  `PAT_ID`, `PAT_ENC_CSN_ID` and more — and an HMAC of an MRN is a value **derived from**
+  the individual. §164.514(c)(1) admits a re-identification code only when it is "not
+  derived from or related to information about the individual", and HHS §2.9 permits
+  hash-derived values under **Expert Determination**, keys undisclosed. The data was never
+  unsafe; the *claim attached to it* was wrong, which is the harder failure to notice
+  because every data check was green.
+  - New `determination.assess_method_eligibility()` walks the active profile for strategies
+    that emit derived values (`tokenize`, `date_shift`) and reports the strongest claimable
+    method. It **computes** eligibility instead of reading a declaration, for the same reason
+    the semantic model is generated: a declaration drifts, and this one drifts into a false
+    compliance claim.
+  - `DeterminationReport` gained `method_eligibility`; a supplied-and-failing eligibility
+    fails the whole evidence pack.
+  - `NB_scorecard` now claims `expert_determination` and **hard-gates** that claim against
+    the config. Verified in Fabric both ways: the run passes as configured, and flipping the
+    claim back to `safe_harbor` fails the notebook with
+    `AssertionError: De-identification scorecard FAILED: ["Claimed method 'safe_harbor' is
+    supported by profile 'safe_harbor'"]`.
+- **Capping `Age` at 90 leaked the age it was removing.** `Age` was capped but `DateOfBirth`
+  was generalized with plain `kind: year`, and the two never spoke to each other. In the live
+  demo dataset that published `Age = 90` alongside six distinct birth years (1931–1936) for
+  19 patients — the cap removed the age and the year handed it straight back.
+  §164.514(b)(2)(i)(C) requires removing ages over 89 *and* "all elements of dates (including
+  year) indicative of such age".
+  - New `generalize` kind **`birth_year`** floors any birth year old enough to imply 90+ into
+    a single bucket (`reference_year - cap_age`), matching HHS's worked example: born 1910,
+    seen 2010, report "on or before 1920". Applied to `dim_patient.DateOfBirth` and
+    `clarity_patient.BIRTH_DATE`. Ordinary service/encounter dates keep plain `year` — they
+    are not indicative of age.
+  - `reference_year` is an optional param so runs can be pinned for reproducibility; unset it
+    tracks the current year.
+- **The scorecard's ZIP check was weaker than the transformation it verified.** The engine has
+  always zeroed all 17 HHS restricted low-population prefixes, but the check only asserted
+  `length(ZIP) <= 3` — a literal `036` would have passed. It now asserts against the same
+  `RESTRICTED_ZIP3` set the engine applies, which is now public for exactly that reason.
+
+### Changed
+- **Scorecard results are three-state: `PASS` / `FAIL` / `NOT_EVALUATED`.** The notebook only
+  ever inspects structured Delta tables, so HIPAA identifiers (P) biometrics and (Q) full-face
+  photographs were being counted in a "0 of 18" claim that no code path could substantiate.
+  They are now explicitly `NOT_EVALUATED` — never gating, always printed and persisted to the
+  evidence artifact. A check that was never run is not a check that passed.
+- Documentation no longer claims "0 of the 18 Safe Harbor identifiers": README, QUICKSTART and
+  `docs/safe_harbor_mapping.md` now state the 16 in-scope identifiers, the two declared blind
+  spots, and why the claimable method is Expert Determination.
+
 ### Added
 - **All 17 gold tables are now in the semantic model.** The seven `gold_safe_*_clarity_*`
   tables were being built and published on every run and were invisible in Power BI: the

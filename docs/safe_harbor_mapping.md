@@ -8,6 +8,23 @@ HIPAA **Safe Harbor** (45 CFR §164.514(b)(2)) requires removing or generalizing
 identifier types. Below: each identifier, where it appears in each bundled source, and the
 strategy the engine applies (see [`config/deid_rules.yaml`](../config/deid_rules.yaml)).
 
+> ### The shipped profile cannot claim Safe Harbor — and that is deliberate
+>
+> The `safe_harbor` profile name describes its **column treatments** (dates → year, ZIP → 3
+> digits, ages capped at 90). It is not a certification that the output qualifies for a Safe
+> Harbor claim, because the `tokenize` rules in rows 8, 11 and 18 emit values **derived from**
+> the individual. §164.514(c)(1) admits a re-identification code only when it is "not derived
+> from or related to information about the individual", and HHS §2.9 permits hash-derived
+> values under **Expert Determination**, with the keys undisclosed.
+>
+> Those tokens are what let the de-identified Caboodle and Clarity stars still join — the whole
+> point of the accelerator — so the trade is intentional. The cost is that the claimable method
+> is Expert Determination. `determination.assess_method_eligibility()` computes this from the
+> rules themselves and `NB_scorecard` **hard-fails** a mismatched claim, so the constant cannot
+> quietly drift into a false one. Remove every `tokenize` / `date_shift` rule and a Safe Harbor
+> claim becomes available again — at the price of cross-source linkage.
+
+
 The two sources are deliberately different shapes — **Caboodle** (dimensional warehouse)
 and **Clarity** (normalized transactional). The same engine handles both; only the column
 names differ, which is exactly the point.
@@ -16,7 +33,7 @@ names differ, which is exactly the point.
 |---|------------------------|--------------------|-------------------|----------|
 | 1 | Names | `FirstName`, `LastName`, `PatientName`, provider names | `PAT_NAME`, `PAT_FIRST_NAME`, `PAT_LAST_NAME`, `PROV_NAME` | `synthesize` |
 | 2 | Geographic subdivisions < state | patient `ZIP` | `ZIP`, `CITY`, `ADD_LINE_1` | `generalize(zip3)` (`000` for low-pop); city/street `suppress` |
-| 3 | Dates (except year) related to an individual | `DateOfBirth`, `ServiceDate`, `EncounterDate`, `ScoreDate`, `*Month` | `BIRTH_DATE`, `DEATH_DATE`, `PAT_ENC_DATE`, `CONTACT_DATE`, `HOSP_ADMSN_TIME`, `HOSP_DISCH_TIME`, `ORDERING_DATE`, `START_DATE`, `END_DATE`, `PROC_START_TIME`, `RESULT_DATE`, `ENC_MONTH` | `generalize(year)` (Safe Harbor) / `date_shift` by `PAT_ID` (Expert Determination); month suppressed |
+| 3 | Dates (except year) related to an individual | `DateOfBirth`, `ServiceDate`, `EncounterDate`, `ScoreDate`, `*Month` | `BIRTH_DATE`, `DEATH_DATE`, `PAT_ENC_DATE`, `CONTACT_DATE`, `HOSP_ADMSN_TIME`, `HOSP_DISCH_TIME`, `ORDERING_DATE`, `START_DATE`, `END_DATE`, `PROC_START_TIME`, `RESULT_DATE`, `ENC_MONTH` | `generalize(year)`; **birth dates use `generalize(birth_year)`** (see row — below) / `date_shift` by `PAT_ID` (Expert Determination); month suppressed |
 | 4 | Telephone numbers | — | `HOME_PHONE` | `suppress` |
 | 5 | Fax numbers | — | — | — |
 | 6 | Email addresses | — | `EMAIL_ADDRESS` | `suppress` |
@@ -29,12 +46,20 @@ names differ, which is exactly the point.
 | 13 | Device identifiers / serial numbers | — | — | — |
 | 14 | Web URLs | — | — | — |
 | 15 | IP addresses | — | — | — |
-| 16 | Biometric identifiers | — | — | — |
-| 17 | Full-face photos / comparable images | — | — | — |
-| 18 | Any other unique identifying number/characteristic/code | `NPI` | `NPI`, `PAT_ID`, `PAT_ENC_CSN_ID` | `tokenize` (`NP-` / `EP-` / `ENC-`) |
-| — | Ages > 89 must be aggregated | `Age` | `AGE` | `generalize(age_cap=90)` |
+| 16 | Biometric identifiers | — | — | **`NOT_EVALUATED`** — no biometric modality in scope |
+| 17 | Full-face photos / comparable images | — | — | **`NOT_EVALUATED`** — no imaging path in the pipeline |
+| 18 | Any other unique identifying number/characteristic/code | `NPI` | `NPI`, `PAT_ID`, `PAT_ENC_CSN_ID` | `tokenize` (`NP-` / `EP-` / `ENC-`) — derived value; see the note above |
+| — | Ages > 89 must be aggregated, **and so must dates indicative of such age** | `Age`, `DateOfBirth` | `AGE`, `BIRTH_DATE` | `generalize(age_cap=90)` **and** `generalize(birth_year, cap_age=90)` |
 
 ## Notes on judgment calls
+
+- **Capping `Age` at 90 is not enough on its own.** §164.514(b)(2)(i)(C) removes ages over 89
+  *and* "all elements of dates (including year) indicative of such age". Publishing a capped
+  `Age = 90` next to a true `BirthYear` defeats the cap — the year reconstructs the age that
+  was just removed. The `birth_year` kind therefore floors every birth year old enough to imply
+  90+ into a single bucket (`reference_year - cap_age`), matching HHS's worked example: born
+  1910, seen in 2010, report "on or before 1920". Ordinary service and encounter dates keep the
+  plain `year` kind — they are not indicative of age.
 
 - **`PAT_ENC_CSN_ID` is tokenized; Caboodle's `EncounterKey` is not.** Both are "the
   encounter identifier," but a CSN is printed on discharge paperwork and displayed in the

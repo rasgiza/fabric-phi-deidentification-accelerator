@@ -69,7 +69,16 @@ flowchart LR
 ```
 
 The Gold layer that Power BI and Copilot read contains **no PHI by construction** —
-`NB_scorecard` proves it by asserting **0 of the 18 HIPAA Safe Harbor identifiers** survive.
+`NB_scorecard` proves it by asserting that none of the **16 HIPAA identifiers that exist in
+the bundled schemas** survive. The remaining two — (P) biometric identifiers and (Q) full-face
+photographs — are reported as `NOT_EVALUATED`, because the pipeline reads structured Delta
+tables and has no imaging path: a check that was never run is not a check that passed.
+
+The scorecard also verifies **which HIPAA method you may claim**. The pipeline tokenizes MRNs
+so the de-identified Caboodle and Clarity stars can still join, and an HMAC of an MRN is a
+value derived from the individual — permitted under **Expert Determination** (HHS §2.9) but not
+under Safe Harbor's re-identification-code exception (§164.514(c)(1)). The gate compares the
+claimed method against what the rulebook actually does and fails the run on a mismatch.
 
 ### Auditing and evidence
 

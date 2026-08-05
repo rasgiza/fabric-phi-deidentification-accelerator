@@ -51,5 +51,14 @@ HIPAA's use/disclosure constraints. That is the accelerator's core value:
 - [ ] Key Vault holds the pepper; rotation process approved.
 - [ ] `deid_rules.yaml` validated against the real schema by a qualified reviewer.
 - [ ] All 18 Safe Harbor identifiers addressed **or** Expert Determination obtained.
+- [ ] The two identifiers the scorecard reports as `NOT_EVALUATED` — (P) biometrics and
+      (Q) full-face photographs — are confirmed absent from your sources, or covered by a
+      control outside this pipeline. The scorecard reads structured Delta tables only and
+      says so rather than passing them silently.
+- [ ] The method you claim matches the method the rulebook supports. If any column is
+      tokenized or date-shifted, the output carries values derived from the individual and
+      the claimable method is **Expert Determination**, not Safe Harbor. `NB_scorecard`
+      enforces this, but the determination itself must still be signed by a qualified
+      statistician.
 - [ ] `NB_scorecard` passes; audit logging enabled for `NB_reidentify`.
 - [ ] Certifications retrieved from the Service Trust Portal for your compliance file.

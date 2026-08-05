@@ -61,7 +61,7 @@ treatment, payment, or operations.
 
 | Requirement | Description | Enforcement in this repo |
 |-------------|-------------|--------------------------|
-| **HIPAA Safe Harbor** (45 CFR §164.514(b)(2)) | Remove/generalize the 18 identifiers | `safe_harbor` profile in [config/deid_rules.yaml](../config/deid_rules.yaml); mapping in [docs/safe_harbor_mapping.md](safe_harbor_mapping.md) |
+| **HIPAA Safe Harbor** (45 CFR §164.514(b)(2)) | Remove/generalize the 18 identifiers | `safe_harbor` profile in [config/deid_rules.yaml](../config/deid_rules.yaml); mapping in [docs/safe_harbor_mapping.md](safe_harbor_mapping.md). **The profile name describes its column treatments, not the claim you may make** — it tokenizes MRNs so the two stars stay joinable, and §164.514(c)(1) does not admit a code derived from the individual. `assess_method_eligibility()` computes the claimable method from the rules and `NB_scorecard` hard-gates the claim. |
 | **HIPAA Expert Determination** (45 CFR §164.514(b)(1)) | Statistical assessment of re-identification risk | `expert_determination` profile (per-patient date-shift preserving intervals) + residual-risk metrics ([src/fabric_phi_deid/privacy_metrics.py](../src/fabric_phi_deid/privacy_metrics.py)) |
 | **State privacy laws** | Additional requirements where applicable | `[document state-specific rules; extend deid_rules.yaml]` |
 | **Internal governance** | Enterprise security & AI policies | [docs/enforcement_models.md](enforcement_models.md), [docs/hipaa_compliance.md](hipaa_compliance.md) |
@@ -87,8 +87,8 @@ The table below is the human-readable summary; the config is what actually runs.
 | Telephone / fax | Remove | `suppress` + scorecard phone pattern scan |
 | Full address | Remove | `AddressLine1` → `suppress` |
 | ZIP code | Truncate per policy | `generalize(zip3)`; `000` for low-population prefixes |
-| Dates (DOB, service, encounter) | Generalize / shift | `generalize(year)` (Safe Harbor) or `date_shift` (Expert Determination); month suppressed |
-| Ages > 89 | Aggregate | `generalize(age_cap=90)` |
+| Dates (DOB, service, encounter) | Generalize / shift | `generalize(year)` for service and encounter dates, `generalize(birth_year)` for dates of birth (Safe Harbor) or `date_shift` (Expert Determination); month suppressed |
+| Ages > 89 | Aggregate | `generalize(age_cap=90)` **and** `generalize(birth_year, cap_age=90)`, which floors every birth year old enough to imply 90+ into one bucket. Capping the age alone is not enough: §164.514(b)(2)(i)(C) also removes "all elements of dates (including year) indicative of such age", and a true birth year reconstructs the age the cap removed. |
 | Device / biometric / images | Remove or redact | `suppress` (present-in-schema); free-text via `ner_text` |
 | **Free-text narrative** (notes, reason-for-visit, comments) | Detect + redact spans in place | `redact_text` \u2014 `ner_text` finds identifier spans and replaces each with its label (Safe Harbor) or an HMAC token (Expert Determination). Applied to `fact_encounter.ReasonForVisitNote`. Recall depends on the backend: Presidio (`[nlp]` extra) covers names/places/dates; the regex fallback covers MRN, phone, email, SSN, card, IP, URL only. |
 | **Any unlisted column** | **Remove** | **Deny-by-default `suppress`** \u2014 new identifiers cannot leak by omission |
