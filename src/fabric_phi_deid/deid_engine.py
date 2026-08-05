@@ -80,17 +80,28 @@ def strat_suppress(value: Any, params: dict, pepper: str) -> Any:
 
 
 def strat_tokenize(value: Any, params: dict, pepper: str) -> Any:
-    if value is None or value == "":
+    """Deterministic keyed token.
+
+    ``strip_separators`` may be set per-column in the rulebook when two source systems
+    write the same identifier with different punctuation (``A12-3456`` vs ``A123456``).
+    It is off unless asked for, because removing separators can merge two genuinely
+    different identifiers -- see tokenization.normalize_identifier.
+    """
+    if value is None or str(value).strip() == "":
         return value
     namespace = params.get("namespace", "default")
+    strip_separators = bool(params.get("strip_separators", False))
     if params.get("format_preserving"):
-        return tokenize_format_preserving(str(value), pepper, namespace=namespace)
+        return tokenize_format_preserving(
+            str(value), pepper, namespace=namespace, strip_separators=strip_separators
+        )
     return tokenize(
         str(value),
         pepper,
         namespace=namespace,
         length=int(params.get("length", 16)),
         prefix=params.get("prefix", ""),
+        strip_separators=strip_separators,
     )
 
 

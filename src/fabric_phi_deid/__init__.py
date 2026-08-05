@@ -6,7 +6,8 @@ sign-off (see docs/pre_real_phi_checklist.md).
 
 Public API
 ----------
-- Tokenization:      tokenize, tokenize_numeric, tokenize_format_preserving, get_pepper
+- Tokenization:      tokenize, tokenize_numeric, tokenize_format_preserving,
+                     normalize_identifier, get_pepper
 - Strategy engine:   apply_strategy, load_rules, resolve_column_strategy, deidentify_table
 - Config integrity:  validate_config, audit_coverage, ConfigValidationError
 - Audit:             config_fingerprint, RunManifest, build_run_manifest, get_audit_logger
@@ -75,6 +76,7 @@ from .privacy_metrics import (
 )
 from .tokenization import (
     get_pepper,
+    normalize_identifier,
     tokenize,
     tokenize_format_preserving,
     tokenize_numeric,
@@ -87,6 +89,7 @@ __all__ = [
     "tokenize",
     "tokenize_numeric",
     "tokenize_format_preserving",
+    "normalize_identifier",
     "get_pepper",
     # engine
     "apply_strategy",

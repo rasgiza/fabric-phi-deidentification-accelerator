@@ -311,6 +311,133 @@ def silver_dependencies(include_clarity: bool = True) -> tuple[str, ...]:
     return tuple(dict.fromkeys(required))
 
 
+#: Below this share of the smaller cohort, a cross-source match rate is treated as a
+#: configuration failure rather than a finding. Chosen deliberately low: real overlap
+#: varies enormously by deployment, but *near-zero* overlap between two extracts from the
+#: same organisation essentially never happens for a benign reason.
+MIN_PLAUSIBLE_LINKAGE_RATE = 0.01
+
+#: Below this share, the run still succeeds but the report says the number looks wrong.
+SUSPICIOUS_LINKAGE_RATE = 0.20
+
+
+class LinkageReport(NamedTuple):
+    """How many patients the conformed dimension actually managed to link, and whether
+    that number is believable.
+
+    This exists because a broken linkage is **silent**. If the join key is wrong, the
+    pepper differs between runs, the two systems format MRNs differently, or the sample
+    data was generated independently, the union still succeeds, the star still builds,
+    every publish gate still passes -- and ``SourceSystem`` is simply never ``'Both'``.
+    The pipeline reports success while the single thing the conformed dimension exists to
+    do has quietly not happened. Nothing else in the accelerator notices, because nothing
+    else is looking at *how many* rows matched.
+
+    So the match rate is promoted to a first-class, asserted output.
+    """
+
+    caboodle_patients: int
+    clarity_patients: int
+    matched: int
+
+    @property
+    def smaller_cohort(self) -> int:
+        return min(self.caboodle_patients, self.clarity_patients)
+
+    @property
+    def linkage_rate(self) -> float:
+        """Matched patients as a share of the smaller cohort.
+
+        The smaller cohort is the denominator because it is the ceiling: 1,000 Clarity
+        patients can never match more than 1,000 of 50,000 Caboodle patients, and scoring
+        that against the larger side would make a perfect link look like a 2% failure.
+        """
+        return self.matched / self.smaller_cohort if self.smaller_cohort else 0.0
+
+    @property
+    def caboodle_only(self) -> int:
+        return self.caboodle_patients - self.matched
+
+    @property
+    def clarity_only(self) -> int:
+        return self.clarity_patients - self.matched
+
+    @property
+    def conformed_rows(self) -> int:
+        """Expected ``gold_safe_dim_patient`` row count: the union, not the sum."""
+        return self.caboodle_patients + self.clarity_only
+
+    @property
+    def status(self) -> str:
+        if self.smaller_cohort == 0:
+            # Caboodle-only (or Clarity-only) deployment: there is nothing to link, so a
+            # 0% match rate is the correct answer rather than a failure.
+            return "not_applicable"
+        if self.linkage_rate < MIN_PLAUSIBLE_LINKAGE_RATE:
+            return "implausible"
+        if self.linkage_rate < SUSPICIOUS_LINKAGE_RATE:
+            return "suspicious"
+        return "ok"
+
+    def format(self) -> str:
+        return (
+            f"Cross-source patient linkage: {self.matched:,} matched "
+            f"({self.linkage_rate:.1%} of the smaller cohort)\n"
+            f"  {SOURCE_CABOODLE:<9}: {self.caboodle_patients:,} patients "
+            f"({self.caboodle_only:,} Caboodle-only)\n"
+            f"  {SOURCE_CLARITY:<9}: {self.clarity_patients:,} patients "
+            f"({self.clarity_only:,} Clarity-only)\n"
+            f"  {SOURCE_BOTH:<9}: {self.matched:,}\n"
+            f"  conformed dim_patient rows: {self.conformed_rows:,}\n"
+            f"  status: {self.status}"
+        )
+
+    def raise_if_implausible(self) -> None:
+        """Fail the build when the two sources essentially did not link at all."""
+        if self.status != "implausible":
+            return
+        raise ValueError(
+            f"{self.format()}\n\n"
+            f"Only {self.matched:,} of {self.smaller_cohort:,} patients in the smaller "
+            f"cohort linked across sources. Two extracts from the same organisation do "
+            f"not overlap this little, so this is almost certainly configuration, not "
+            f"data. Check, in order:\n"
+            f"  1. Both sources were de-identified in the SAME run with the SAME pepper. "
+            f"A different pepper produces different tokens for the same patient.\n"
+            f"  2. {CLARITY_MRN_COLUMN} and Caboodle's {CABOODLE_MRN_COLUMN} are both "
+            f"tokenized under the SAME namespace in config/deid_rules.yaml. Different "
+            f"namespaces are designed never to collide.\n"
+            f"  3. The two systems write the identifier the same way. Case and padding "
+            f"are normalized automatically; a leading 'MRN' prefix on one side only, or "
+            f"different assigning authorities, are not.\n"
+            f"  4. The extracts actually describe overlapping populations. Independently "
+            f"generated sample data will not overlap at all.\n"
+            f"If low overlap is genuinely expected here, lower "
+            f"MIN_PLAUSIBLE_LINKAGE_RATE or skip the check explicitly -- don't let it "
+            f"pass silently."
+        )
+
+
+def assess_linkage(caboodle_patients: int, clarity_patients: int, matched: int) -> LinkageReport:
+    """Build a :class:`LinkageReport` from three counts the notebook already has.
+
+    Takes plain integers rather than DataFrames so the thresholds and arithmetic are
+    unit-testable without a Spark session, in keeping with the rest of this module.
+    """
+    if matched > min(caboodle_patients, clarity_patients):
+        raise ValueError(
+            f"matched ({matched:,}) exceeds the smaller cohort "
+            f"({min(caboodle_patients, clarity_patients):,}). The patient join has fanned "
+            f"out -- a duplicate key on one side is multiplying rows, which would also "
+            f"duplicate every fact that joins through it."
+        )
+    return LinkageReport(
+        caboodle_patients=caboodle_patients,
+        clarity_patients=clarity_patients,
+        matched=matched,
+    )
+
+
 def iter_ruled_projections(
     ruled_tables: Mapping[str, object],
 ) -> Iterator[tuple[str, str, str]]:
