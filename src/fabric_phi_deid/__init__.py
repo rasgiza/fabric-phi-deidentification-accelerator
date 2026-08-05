@@ -45,8 +45,14 @@ from .deid_engine import (
     resolve_table_plan,
 )
 from .determination import (
+    DERIVED_VALUE_STRATEGIES,
+    EXPERT_DETERMINATION,
+    SAFE_HARBOR,
+    DerivedValueRule,
     DeterminationReport,
+    MethodEligibility,
     ResidualScanResult,
+    assess_method_eligibility,
     build_determination_report,
     residual_scan_from_hits,
 )
@@ -123,6 +129,12 @@ __all__ = [
     "SuppressionReport",
     # expert determination evidence pack
     "DeterminationReport",
+    "MethodEligibility",
+    "DerivedValueRule",
+    "SAFE_HARBOR",
+    "EXPERT_DETERMINATION",
+    "DERIVED_VALUE_STRATEGIES",
+    "assess_method_eligibility",
     "ResidualScanResult",
     "build_determination_report",
     "residual_scan_from_hits",

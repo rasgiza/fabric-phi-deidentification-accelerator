@@ -34,9 +34,133 @@ from .privacy_metrics import KAnonymityReport, LDiversityReport, TClosenessRepor
 __all__ = [
     "ResidualScanResult",
     "DeterminationReport",
+    "MethodEligibility",
+    "DerivedValueRule",
+    "SAFE_HARBOR",
+    "EXPERT_DETERMINATION",
+    "DERIVED_VALUE_STRATEGIES",
+    "assess_method_eligibility",
     "build_determination_report",
     "residual_scan_from_hits",
 ]
+
+
+SAFE_HARBOR = "safe_harbor"
+EXPERT_DETERMINATION = "expert_determination"
+
+# Strategies whose output is *derived from* the individual's own data rather than removed.
+#
+# This is the crux of the two methods. Safe Harbor (§164.514(b)(2)) is a removal standard,
+# and its re-identification-code exception at §164.514(c)(1) admits a code only when it is
+# "not derived from or related to information about the individual". An HMAC of an MRN is
+# derived from the MRN; a per-patient date shift is derived from the patient's real dates.
+# Identifier (R), "any other unique identifying number, characteristic, or code", is written
+# to catch exactly this, and HHS §3.5 says a code derived from PHI "would have to be removed"
+# under Safe Harbor.
+#
+# HHS §2.9 does permit cryptographic-hash-derived values in a de-identified release --
+# but scopes the permission to the **Expert Determination** method, and only while the keys
+# stay undisclosed. So these strategies do not make output unsafe; they make a *Safe Harbor
+# claim* unavailable. The distinction the scorecard has to enforce is which claim you may make.
+DERIVED_VALUE_STRATEGIES = frozenset({"tokenize", "date_shift"})
+
+
+@dataclass(frozen=True)
+class DerivedValueRule:
+    """One configured rule that emits a value derived from the individual."""
+
+    table: str
+    column: str
+    strategy: str
+
+    def __str__(self) -> str:
+        return f"{self.table}.{self.column} ({self.strategy})"
+
+
+@dataclass
+class MethodEligibility:
+    """Which de-identification method a given rulebook profile may actually claim.
+
+    Computed from the config rather than declared alongside it, for the same reason the
+    semantic model is generated rather than hand-maintained: a declaration can drift out of
+    agreement with the rules it describes, and this one drifts silently into a false
+    compliance claim.
+    """
+
+    profile: str
+    claimed_method: str
+    derived_rules: tuple[DerivedValueRule, ...]
+
+    @property
+    def safe_harbor_available(self) -> bool:
+        """True when no rule emits a value derived from the individual."""
+        return not self.derived_rules
+
+    @property
+    def claimable_method(self) -> str:
+        """The strongest method this configuration actually supports."""
+        return SAFE_HARBOR if self.safe_harbor_available else EXPERT_DETERMINATION
+
+    @property
+    def passes(self) -> bool:
+        """True when the claimed method is supported by the configuration.
+
+        Claiming Expert Determination over a config that would also satisfy Safe Harbor is
+        fine -- it is the weaker claim. The reverse is not.
+        """
+        return not (self.claimed_method == SAFE_HARBOR and not self.safe_harbor_available)
+
+    def summary(self) -> str:
+        verdict = "PASS" if self.passes else "FAIL"
+        if self.passes:
+            detail = f"claim '{self.claimed_method}' is supported by profile '{self.profile}'"
+            if self.derived_rules:
+                detail += f" ({len(self.derived_rules)} derived-value rule(s))"
+        else:
+            shown = ", ".join(str(r) for r in self.derived_rules[:3])
+            more = f" (+{len(self.derived_rules) - 3} more)" if len(self.derived_rules) > 3 else ""
+            detail = (
+                f"profile '{self.profile}' claims Safe Harbor but emits "
+                f"{len(self.derived_rules)} value(s) derived from the individual: "
+                f"{shown}{more}. Per HHS \u00a72.9 these require Expert Determination"
+            )
+        return f"[method-eligibility {verdict}] {detail}"
+
+
+def assess_method_eligibility(
+    cfg: dict[str, Any],
+    *,
+    claimed_method: str,
+    profile: str | None = None,
+) -> MethodEligibility:
+    """Check a claimed de-identification method against what the rulebook actually does.
+
+    Parameters
+    ----------
+    cfg:
+        The loaded ``deid_rules.yaml``.
+    claimed_method:
+        The method the operator intends to assert, e.g. ``"safe_harbor"``. This is a human
+        claim on purpose -- the point of the check is to test an assertion, not to derive one
+        and then agree with itself.
+    profile:
+        Profile to inspect. Defaults to the config's ``active_profile``.
+    """
+    profile = profile or cfg.get("active_profile", "")
+    tables = cfg.get("profiles", {}).get(profile, {}).get("tables", {}) or {}
+
+    derived: list[DerivedValueRule] = []
+    for table, columns in tables.items():
+        for column, rule in (columns or {}).items():
+            strategy = rule if isinstance(rule, str) else (rule or {}).get("strategy")
+            if strategy in DERIVED_VALUE_STRATEGIES:
+                derived.append(DerivedValueRule(table=table, column=column, strategy=strategy))
+
+    return MethodEligibility(
+        profile=profile,
+        claimed_method=claimed_method,
+        derived_rules=tuple(derived),
+    )
 
 
 @dataclass
@@ -83,6 +207,7 @@ class DeterminationReport:
     l_diversity: LDiversityReport | None
     t_closeness: TClosenessReport | None
     residual_scan: ResidualScanResult | None
+    method_eligibility: MethodEligibility | None = None
     notes: str | None = None
 
     @property
@@ -91,12 +216,16 @@ class DeterminationReport:
 
         A check that was not supplied (``None``) is treated as not-applicable and does not
         block the gate — the reviewer decides which metrics are required for their dataset.
+        The one exception in spirit is ``method_eligibility``: when it *is* supplied it can
+        fail the whole pack on its own, because a pack that asserts an unavailable method is
+        not weak evidence, it is wrong evidence.
         """
         checks = [
             self.k_anonymity.passes if self.k_anonymity else True,
             self.l_diversity.passes if self.l_diversity else True,
             self.t_closeness.passes if self.t_closeness else True,
             self.residual_scan.clean if self.residual_scan else True,
+            self.method_eligibility.passes if self.method_eligibility else True,
         ]
         return all(checks)
 
@@ -163,6 +292,19 @@ class DeterminationReport:
                 if self.residual_scan
                 else None
             ),
+            "method_eligibility": (
+                {
+                    "summary": self.method_eligibility.summary(),
+                    "passes": self.method_eligibility.passes,
+                    "profile": self.method_eligibility.profile,
+                    "claimed_method": self.method_eligibility.claimed_method,
+                    "claimable_method": self.method_eligibility.claimable_method,
+                    "safe_harbor_available": self.method_eligibility.safe_harbor_available,
+                    "derived_value_rules": [str(r) for r in self.method_eligibility.derived_rules],
+                }
+                if self.method_eligibility
+                else None
+            ),
             "notes": self.notes,
         }
 
@@ -187,10 +329,24 @@ class DeterminationReport:
         if expired is not None:
             lines.append(f"- **Review expired:** {'YES' if expired else 'no'}")
         lines += ["", "## Checks", ""]
-        for obj in (self.k_anonymity, self.l_diversity, self.t_closeness, self.residual_scan):
+        for obj in (
+            self.method_eligibility,
+            self.k_anonymity,
+            self.l_diversity,
+            self.t_closeness,
+            self.residual_scan,
+        ):
             if obj is not None:
                 lines.append(f"- {obj.summary()}")
-        if not any((self.k_anonymity, self.l_diversity, self.t_closeness, self.residual_scan)):
+        if not any(
+            (
+                self.method_eligibility,
+                self.k_anonymity,
+                self.l_diversity,
+                self.t_closeness,
+                self.residual_scan,
+            )
+        ):
             lines.append("- _no checks supplied_")
         if self.notes:
             lines += ["", "## Notes", "", self.notes]
@@ -212,6 +368,7 @@ def build_determination_report(
     l_diversity: LDiversityReport | None = None,
     t_closeness: TClosenessReport | None = None,
     residual_scan: ResidualScanResult | None = None,
+    method_eligibility: MethodEligibility | None = None,
     reviewer: str | None = None,
     review_by_utc: str | None = None,
     notes: str | None = None,
@@ -231,6 +388,9 @@ def build_determination_report(
         your dataset; omitted metrics are treated as not-applicable.
     residual_scan : ResidualScanResult, optional
         Aggregate outcome of a residual direct-identifier scan over the de-identified output.
+    method_eligibility : MethodEligibility, optional
+        Result of :func:`assess_method_eligibility` — whether ``method`` is a claim the
+        rulebook actually supports. Supply this whenever you assert a method publicly.
     reviewer, review_by_utc : str, optional
         The qualified reviewer and the (time-limited) review-by date.
     """
@@ -245,6 +405,7 @@ def build_determination_report(
         l_diversity=l_diversity,
         t_closeness=t_closeness,
         residual_scan=residual_scan,
+        method_eligibility=method_eligibility,
         notes=notes,
     )
 
