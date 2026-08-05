@@ -165,10 +165,11 @@ def test_mrn_resolves_to_tokenize():
     assert strat == "tokenize" and params.get("namespace") == "mrn"
 
 
-def test_dob_resolves_to_year_generalization():
+def test_dob_resolves_to_floored_birth_year_generalization():
+    """DOB uses ``birth_year``, not plain ``year``: the plain year leaks ages over 89."""
     cfg = _cfg()
     strat, params = resolve_column_strategy(cfg, "safe_harbor", "dim_patient", "DateOfBirth")
-    assert strat == "generalize" and params.get("kind") == "year"
+    assert strat == "generalize" and params.get("kind") == "birth_year"
 
 
 def test_surrogate_key_passthrough():

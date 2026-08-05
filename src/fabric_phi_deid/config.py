@@ -42,7 +42,10 @@ STRATEGY_SPECS: dict[str, dict[str, Any]] = {
     "passthrough": {"required": [], "enums": {}},
     "suppress": {"required": [], "enums": {}},
     "tokenize": {"required": [], "enums": {}},
-    "generalize": {"required": ["kind"], "enums": {"kind": {"year", "zip3", "age_cap"}}},
+    "generalize": {
+        "required": ["kind"],
+        "enums": {"kind": {"year", "birth_year", "zip3", "age_cap"}},
+    },
     "date_shift": {"required": ["entity_column"], "enums": {}},
     "synthesize": {
         "required": ["kind"],

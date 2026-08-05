@@ -136,7 +136,7 @@ def test_safe_harbor_never_emits_a_full_date(cfg, table):
         strategy, params = resolve_column_strategy(cfg, "safe_harbor", table, column)
         if strategy == "suppress":
             continue
-        if strategy == "generalize" and params.get("kind") == "year":
+        if strategy == "generalize" and params.get("kind") in {"year", "birth_year"}:
             continue
         offenders.append((column, strategy, params))
     assert not offenders, f"{table}: Safe Harbor must reduce dates to a year -- {offenders}"

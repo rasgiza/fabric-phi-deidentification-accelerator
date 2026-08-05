@@ -34,6 +34,20 @@ profiles:
   # SAFE HARBOR (§164.514(b)(2)): strip / generalize the 18 identifiers.
   # Dates -> year, ZIP -> 3 digits (000 for low-pop), ages 90+ capped, direct identifiers
   # tokenized or suppressed. Output is de-identified and falls OUTSIDE HIPAA.
+  #
+  # READ THIS BEFORE CLAIMING SAFE HARBOR. The profile name describes the *column
+  # treatments* (year generalization, zip3, age capping) -- it is NOT a certification that
+  # the output qualifies for a Safe Harbor claim. It does not, as shipped, because the
+  # `tokenize` rules below emit values DERIVED FROM the individual (an HMAC of the MRN).
+  # §164.514(c)(1) admits a re-identification code only when it is "not derived from or
+  # related to information about the individual", and HHS §2.9 permits hash-derived values
+  # only under EXPERT DETERMINATION, with the keys undisclosed.
+  #
+  # That is a deliberate trade, not an oversight: the tokens are what let the de-identified
+  # Caboodle and Clarity stars still join, which is the point of the accelerator. The cost is
+  # that the claimable method is expert_determination. `determination.assess_method_eligibility`
+  # computes this from these rules and NB_scorecard hard-fails a mismatched claim, so removing
+  # every tokenize rule below is what would make a Safe Harbor claim available again.
   # -----------------------------------------------------------------------------------
   safe_harbor:
     default_strategy: suppress
@@ -48,7 +62,7 @@ profiles:
         FirstName:         {strategy: synthesize, kind: first_name}
         LastName:          {strategy: synthesize, kind: last_name}
         PatientName:       {strategy: synthesize, kind: name}
-        DateOfBirth:       {strategy: generalize, kind: year}   # -> birth year (int)
+        DateOfBirth:       {strategy: generalize, kind: birth_year, cap_age: 90}
         Age:               {strategy: generalize, kind: age_cap, cap: 90}
         AgeBand:           passthrough                # already generalized in silver
         Gender:            passthrough
@@ -173,7 +187,7 @@ profiles:
         PAT_NAME:          {strategy: synthesize, kind: name}
         PAT_FIRST_NAME:    {strategy: synthesize, kind: first_name}
         PAT_LAST_NAME:     {strategy: synthesize, kind: last_name}
-        BIRTH_DATE:        {strategy: generalize, kind: year}
+        BIRTH_DATE:        {strategy: generalize, kind: birth_year, cap_age: 90}
         SEX_C:             passthrough              # ZC_SEX code, not identifying
         MARITAL_STATUS_C:  passthrough
         PAT_STATUS_C:      passthrough
