@@ -40,7 +40,8 @@ grain and link back through the conformed ``PatientKey``. Forcing them into
 
 from __future__ import annotations
 
-from typing import Iterator, Mapping, NamedTuple
+from collections.abc import Iterator, Mapping
+from typing import NamedTuple
 
 # ---------------------------------------------------------------------------
 # Conformance keys
@@ -103,6 +104,20 @@ class GoldTable(NamedTuple):
         """Every upstream column this table reads, verbatim or year-generalised."""
         return tuple(self.columns) + tuple(self.year_columns)
 
+    @property
+    def published_columns(self) -> tuple[str, ...]:
+        """Columns this table actually lands in gold, in write order.
+
+        Distinct from :attr:`projected_columns`, which names the *upstream* silver
+        columns. Here the date columns have become years and -- for a Clarity fact --
+        the resolved :data:`PATIENT_KEY` has been appended. This is the contract the
+        semantic model binds to, so it is derived here rather than restated there.
+        """
+        published = tuple(self.columns) + tuple(self.year_columns.values())
+        if self.patient_link:
+            published += (PATIENT_KEY,)
+        return published
+
 
 # ---------------------------------------------------------------------------
 # Caboodle star (unchanged shape -- pinned here so both gold notebooks share one source
@@ -113,9 +128,17 @@ CABOODLE_GOLD: dict[str, GoldTable] = {
     "dim_provider": GoldTable(
         source="dim_provider",
         columns=(
-            "ProviderKey", "NPI", "ProviderFullName", "Credentials", "Gender",
-            "ProviderType", "PrimarySpecialty", "ProviderStatus", "IsActive",
-            "HireDate", "TerminationDate",
+            "ProviderKey",
+            "NPI",
+            "ProviderFullName",
+            "Credentials",
+            "Gender",
+            "ProviderType",
+            "PrimarySpecialty",
+            "ProviderStatus",
+            "IsActive",
+            "HireDate",
+            "TerminationDate",
         ),
     ),
     "dim_department": GoldTable(
@@ -141,17 +164,34 @@ CABOODLE_GOLD: dict[str, GoldTable] = {
     "fact_encounter": GoldTable(
         source="fact_encounter",
         columns=(
-            "EncounterKey", "PatientKey", "AttendingProviderKey", "ReferringProviderKey",
-            "DepartmentKey", "LocationKey", "DiagnosisKey", "EncounterType", "LengthOfStay",
+            "EncounterKey",
+            "PatientKey",
+            "AttendingProviderKey",
+            "ReferringProviderKey",
+            "DepartmentKey",
+            "LocationKey",
+            "DiagnosisKey",
+            "EncounterType",
+            "LengthOfStay",
         ),
         year_columns={"EncounterDate": "EncounterYear"},
     ),
     "fact_claim": GoldTable(
         source="fact_claim",
         columns=(
-            "ClaimKey", "PatientKey", "BillingProviderKey", "RenderingProviderKey",
-            "PayerKey", "ProcedureKey", "DiagnosisKey", "BilledAmount", "AllowedAmount",
-            "PaidAmount", "PatientResponsibility", "AllowedVariance", "ClaimStatus",
+            "ClaimKey",
+            "PatientKey",
+            "BillingProviderKey",
+            "RenderingProviderKey",
+            "PayerKey",
+            "ProcedureKey",
+            "DiagnosisKey",
+            "BilledAmount",
+            "AllowedAmount",
+            "PaidAmount",
+            "PatientResponsibility",
+            "AllowedVariance",
+            "ClaimStatus",
             "DeniedFlag",
         ),
         year_columns={"ServiceDate": "ServiceYear"},
@@ -171,8 +211,16 @@ CABOODLE_GOLD: dict[str, GoldTable] = {
 PATIENT_FROM_CABOODLE = GoldTable(
     source="dim_patient",
     columns=(
-        "PatientKey", "MRN", "PatientName", "Age", "AgeBand", "Gender", "Race",
-        "Ethnicity", "ZIP", "PCPProviderKey",
+        "PatientKey",
+        "MRN",
+        "PatientName",
+        "Age",
+        "AgeBand",
+        "Gender",
+        "Race",
+        "Ethnicity",
+        "ZIP",
+        "PCPProviderKey",
     ),
     year_columns={"DateOfBirth": "BirthYear"},
 )
@@ -187,7 +235,13 @@ PATIENT_FROM_CABOODLE = GoldTable(
 PATIENT_FROM_CLARITY = GoldTable(
     source="clarity_patient",
     columns=(
-        "PAT_ID", "PAT_MRN_ID", "PAT_NAME", "AGE", "AGE_BAND", "SEX_C", "ZIP",
+        "PAT_ID",
+        "PAT_MRN_ID",
+        "PAT_NAME",
+        "AGE",
+        "AGE_BAND",
+        "SEX_C",
+        "ZIP",
     ),
     year_columns={"BIRTH_DATE": "BirthYear"},
 )
@@ -212,8 +266,19 @@ PATIENT_KEY_SOURCE_COLUMN = CLARITY_MRN_COLUMN
 
 #: Final column order of ``gold_safe_dim_patient``.
 PATIENT_GOLD_COLUMNS: tuple[str, ...] = (
-    "PatientKey", "MRN", "ClarityPatientID", "PatientName", "BirthYear", "Age", "AgeBand",
-    "Gender", "Race", "Ethnicity", "ZIP", "PCPProviderKey", SOURCE_SYSTEM_COLUMN,
+    "PatientKey",
+    "MRN",
+    "ClarityPatientID",
+    "PatientName",
+    "BirthYear",
+    "Age",
+    "AgeBand",
+    "Gender",
+    "Race",
+    "Ethnicity",
+    "ZIP",
+    "PCPProviderKey",
+    SOURCE_SYSTEM_COLUMN,
 )
 
 # ---------------------------------------------------------------------------
@@ -228,8 +293,13 @@ CLARITY_GOLD: dict[str, GoldTable] = {
     "fact_clarity_encounter": GoldTable(
         source="clarity_pat_enc",
         columns=(
-            "PAT_ENC_CSN_ID", "PAT_ID", "ENC_TYPE_C", "APPT_STATUS_C", "DEPARTMENT_ID",
-            "VISIT_PROV_ID", "ENC_CLOSED_YN",
+            "PAT_ENC_CSN_ID",
+            "PAT_ID",
+            "ENC_TYPE_C",
+            "APPT_STATUS_C",
+            "DEPARTMENT_ID",
+            "VISIT_PROV_ID",
+            "ENC_CLOSED_YN",
         ),
         # ENC_MONTH is suppressed by the rulebook (yyyy-MM is finer than Safe Harbor
         # allows), so the encounter grain in gold is the year -- never the month.
@@ -239,8 +309,14 @@ CLARITY_GOLD: dict[str, GoldTable] = {
     "fact_clarity_admission": GoldTable(
         source="clarity_pat_enc_hsp",
         columns=(
-            "PAT_ENC_CSN_ID", "PAT_ID", "ADT_PAT_CLASS", "ADMIT_SOURCE_C", "DISCH_DISP_C",
-            "DEPARTMENT_ID", "ADMISSION_PROV_ID", "LOS_DAYS",
+            "PAT_ENC_CSN_ID",
+            "PAT_ID",
+            "ADT_PAT_CLASS",
+            "ADMIT_SOURCE_C",
+            "DISCH_DISP_C",
+            "DEPARTMENT_ID",
+            "ADMISSION_PROV_ID",
+            "LOS_DAYS",
         ),
         # LOS_DAYS survives as-is: a length of stay is an interval, not a calendar date,
         # so it carries no Safe Harbor date risk while keeping the fact analytically useful.
@@ -256,8 +332,14 @@ CLARITY_GOLD: dict[str, GoldTable] = {
     "fact_clarity_order_med": GoldTable(
         source="clarity_order_med",
         columns=(
-            "ORDER_MED_ID", "PAT_ID", "PAT_ENC_CSN_ID", "MEDICATION_ID",
-            "AUTHRZING_PROV_ID", "ORDER_STATUS_C", "QUANTITY", "HV_DISCRETE_DOSE",
+            "ORDER_MED_ID",
+            "PAT_ID",
+            "PAT_ENC_CSN_ID",
+            "MEDICATION_ID",
+            "AUTHRZING_PROV_ID",
+            "ORDER_STATUS_C",
+            "QUANTITY",
+            "HV_DISCRETE_DOSE",
         ),
         year_columns={
             "ORDERING_DATE": "OrderYear",
@@ -269,8 +351,14 @@ CLARITY_GOLD: dict[str, GoldTable] = {
     "fact_clarity_order_proc": GoldTable(
         source="clarity_order_proc",
         columns=(
-            "ORDER_PROC_ID", "PAT_ID", "PAT_ENC_CSN_ID", "PROC_ID", "AUTHRZING_PROV_ID",
-            "ORDER_STATUS_C", "QUANTITY", "ORDER_TYPE",
+            "ORDER_PROC_ID",
+            "PAT_ID",
+            "PAT_ENC_CSN_ID",
+            "PROC_ID",
+            "AUTHRZING_PROV_ID",
+            "ORDER_STATUS_C",
+            "QUANTITY",
+            "ORDER_TYPE",
         ),
         year_columns={"ORDERING_DATE": "OrderYear", "PROC_START_TIME": "ProcYear"},
         patient_link=CLARITY_PATIENT_LINK,
@@ -278,9 +366,17 @@ CLARITY_GOLD: dict[str, GoldTable] = {
     "fact_clarity_result": GoldTable(
         source="clarity_order_results",
         columns=(
-            "ORDER_PROC_ID", "LINE", "PAT_ID", "PAT_ENC_CSN_ID", "COMPONENT_ID",
-            "ORD_VALUE", "ORD_NUM_VALUE", "REFERENCE_UNIT", "REFERENCE_LOW",
-            "REFERENCE_HIGH", "RESULT_FLAG_C",
+            "ORDER_PROC_ID",
+            "LINE",
+            "PAT_ID",
+            "PAT_ENC_CSN_ID",
+            "COMPONENT_ID",
+            "ORD_VALUE",
+            "ORD_NUM_VALUE",
+            "REFERENCE_UNIT",
+            "REFERENCE_LOW",
+            "REFERENCE_HIGH",
+            "RESULT_FLAG_C",
         ),
         year_columns={"RESULT_DATE": "ResultYear"},
         patient_link=CLARITY_PATIENT_LINK,
@@ -288,11 +384,7 @@ CLARITY_GOLD: dict[str, GoldTable] = {
 }
 
 #: Every gold table name the publish gate must scan, in publish order.
-GOLD_TABLES: tuple[str, ...] = (
-    ("dim_patient",)
-    + tuple(CABOODLE_GOLD)
-    + tuple(CLARITY_GOLD)
-)
+GOLD_TABLES: tuple[str, ...] = ("dim_patient",) + tuple(CABOODLE_GOLD) + tuple(CLARITY_GOLD)
 
 
 def silver_dependencies(include_clarity: bool = True) -> tuple[str, ...]:

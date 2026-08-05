@@ -1,0 +1,89 @@
+table gold_safe_fact_clarity_order_med
+	lineageTag: 20043d16-5059-5ff6-a4f3-f5213f1de69e
+
+	measure 'Clarity Medication Orders' = COUNTROWS ( gold_safe_fact_clarity_order_med )
+		formatString: #,0
+		displayFolder: KPIs
+		lineageTag: 79de2cde-5fc8-5d1e-8a9a-55bd5ef1d1e3
+
+	column ORDER_MED_ID
+		dataType: string
+		lineageTag: bd46d980-65b6-5739-88ab-d8c93ddcca97
+		summarizeBy: none
+		sourceColumn: ORDER_MED_ID
+
+	column PAT_ID
+		dataType: string
+		isHidden
+		lineageTag: 997e95d3-223e-5337-a494-8908e7c63678
+		summarizeBy: none
+		sourceColumn: PAT_ID
+
+	column PAT_ENC_CSN_ID
+		dataType: string
+		lineageTag: d43b04a7-7e24-552b-b7f6-a82f5ba028be
+		summarizeBy: none
+		sourceColumn: PAT_ENC_CSN_ID
+
+	column MEDICATION_ID
+		dataType: string
+		lineageTag: 03c0f80b-5526-5444-b69d-6c4ab735b1b0
+		summarizeBy: none
+		sourceColumn: MEDICATION_ID
+
+	column AUTHRZING_PROV_ID
+		dataType: string
+		isHidden
+		lineageTag: 0f0c1938-2aa4-5ff6-a54e-8633acb396cd
+		summarizeBy: none
+		sourceColumn: AUTHRZING_PROV_ID
+
+	column ORDER_STATUS_C
+		dataType: string
+		lineageTag: 76cf2a6d-2a79-543c-87f7-ef1fb042c4f3
+		summarizeBy: none
+		sourceColumn: ORDER_STATUS_C
+
+	column QUANTITY
+		dataType: int64
+		lineageTag: 640e1c61-452c-512a-ab2e-5d26c5197c36
+		summarizeBy: none
+		sourceColumn: QUANTITY
+
+	column HV_DISCRETE_DOSE
+		dataType: double
+		lineageTag: 9e7b9745-e87f-53bb-8988-5750fd3b1ba7
+		summarizeBy: none
+		sourceColumn: HV_DISCRETE_DOSE
+
+	column OrderYear
+		dataType: int64
+		lineageTag: aad302df-af55-5b93-8783-a72f5d807c9f
+		summarizeBy: none
+		sourceColumn: OrderYear
+
+	column StartYear
+		dataType: int64
+		lineageTag: edb827d9-b867-5297-87d4-c6107bc3b82b
+		summarizeBy: none
+		sourceColumn: StartYear
+
+	column EndYear
+		dataType: int64
+		lineageTag: 62bbe47b-02b1-5a17-b05c-d4f686183310
+		summarizeBy: none
+		sourceColumn: EndYear
+
+	column PatientKey
+		dataType: int64
+		isHidden
+		lineageTag: bb84cba4-3334-5d85-815d-654db2dc6683
+		summarizeBy: none
+		sourceColumn: PatientKey
+
+	partition gold_safe_fact_clarity_order_med = entity
+		mode: directLake
+		source
+			entityName: gold_safe_fact_clarity_order_med
+			schemaName: dbo
+			expressionSource: DatabaseQuery

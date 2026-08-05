@@ -1,0 +1,46 @@
+table gold_safe_dim_clarity_provider
+	lineageTag: 4323e3cc-890a-5e76-8437-d2bb7c59f843
+
+	column PROV_ID
+		dataType: string
+		isKey
+		lineageTag: 1399dc8d-5e26-5b5d-a74e-190e4057063c
+		summarizeBy: none
+		sourceColumn: PROV_ID
+
+	column PROV_NAME
+		dataType: string
+		lineageTag: b9c57804-da79-5d97-8dfb-694b2b63f77b
+		summarizeBy: none
+		sourceColumn: PROV_NAME
+
+	column PROV_TYPE_C
+		dataType: string
+		lineageTag: 87eab0fc-10f7-5dff-9906-20f944597496
+		summarizeBy: none
+		sourceColumn: PROV_TYPE_C
+
+	column SPECIALTY
+		dataType: string
+		lineageTag: 4286e4c8-e561-5f85-9af2-7f552ad6ede3
+		summarizeBy: none
+		sourceColumn: SPECIALTY
+
+	column NPI
+		dataType: string
+		lineageTag: 4b8df965-fa32-5a90-b868-ce0e5cf2a1d6
+		summarizeBy: none
+		sourceColumn: NPI
+
+	column ACTIVE_STATUS
+		dataType: string
+		lineageTag: 4d9cf329-fecc-5809-aa63-02e47592b996
+		summarizeBy: none
+		sourceColumn: ACTIVE_STATUS
+
+	partition gold_safe_dim_clarity_provider = entity
+		mode: directLake
+		source
+			entityName: gold_safe_dim_clarity_provider
+			schemaName: dbo
+			expressionSource: DatabaseQuery

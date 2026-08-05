@@ -1,0 +1,94 @@
+table gold_safe_fact_clarity_result
+	lineageTag: b62090ad-b858-563e-a00f-c4d8c3098bf1
+
+	measure 'Clarity Results' = COUNTROWS ( gold_safe_fact_clarity_result )
+		formatString: #,0
+		displayFolder: KPIs
+		lineageTag: e1f97e75-ba49-5a00-8852-10821af2cbb7
+
+	column ORDER_PROC_ID
+		dataType: string
+		lineageTag: 3211f6b5-fc66-5aa6-94e4-fb46bbd6e89c
+		summarizeBy: none
+		sourceColumn: ORDER_PROC_ID
+
+	column LINE
+		dataType: int64
+		lineageTag: 01651244-3a72-535f-8d1b-f70a73bd4366
+		summarizeBy: none
+		sourceColumn: LINE
+
+	column PAT_ID
+		dataType: string
+		isHidden
+		lineageTag: 3f3c71b2-edb9-57b1-9c85-30099cfaf114
+		summarizeBy: none
+		sourceColumn: PAT_ID
+
+	column PAT_ENC_CSN_ID
+		dataType: string
+		lineageTag: ab3f4c45-b091-55c4-970f-1b7797fe69d1
+		summarizeBy: none
+		sourceColumn: PAT_ENC_CSN_ID
+
+	column COMPONENT_ID
+		dataType: string
+		lineageTag: 40d39b1f-24f9-5abd-bc22-6701b0c0a7f7
+		summarizeBy: none
+		sourceColumn: COMPONENT_ID
+
+	column ORD_VALUE
+		dataType: string
+		lineageTag: 206a6972-a0db-5a52-8d7d-53dd128e3494
+		summarizeBy: none
+		sourceColumn: ORD_VALUE
+
+	column ORD_NUM_VALUE
+		dataType: double
+		lineageTag: b30fadf2-35ab-515f-9541-f3455caf59a1
+		summarizeBy: none
+		sourceColumn: ORD_NUM_VALUE
+
+	column REFERENCE_UNIT
+		dataType: string
+		lineageTag: bd245166-625e-551e-8df6-7b66378e0c9a
+		summarizeBy: none
+		sourceColumn: REFERENCE_UNIT
+
+	column REFERENCE_LOW
+		dataType: string
+		lineageTag: 0f2f26c9-9236-58a0-bfad-aa8052d50709
+		summarizeBy: none
+		sourceColumn: REFERENCE_LOW
+
+	column REFERENCE_HIGH
+		dataType: string
+		lineageTag: 1b6f9aca-767f-56fb-9ef5-71ae29ddb145
+		summarizeBy: none
+		sourceColumn: REFERENCE_HIGH
+
+	column RESULT_FLAG_C
+		dataType: string
+		lineageTag: 81732777-bff2-5f03-9c24-0d0eb9a43459
+		summarizeBy: none
+		sourceColumn: RESULT_FLAG_C
+
+	column ResultYear
+		dataType: int64
+		lineageTag: 8f2bca30-166d-5538-8ed2-bc654e6290f4
+		summarizeBy: none
+		sourceColumn: ResultYear
+
+	column PatientKey
+		dataType: int64
+		isHidden
+		lineageTag: 894edfab-8ba3-56d8-9322-e1249ad1fd9b
+		summarizeBy: none
+		sourceColumn: PatientKey
+
+	partition gold_safe_fact_clarity_result = entity
+		mode: directLake
+		source
+			entityName: gold_safe_fact_clarity_result
+			schemaName: dbo
+			expressionSource: DatabaseQuery

@@ -1,0 +1,71 @@
+table gold_safe_fact_clarity_encounter
+	lineageTag: 57d20e6a-afa5-5d0d-9f08-96cdd7022b81
+
+	measure 'Clarity Encounters' = COUNTROWS ( gold_safe_fact_clarity_encounter )
+		formatString: #,0
+		displayFolder: KPIs
+		lineageTag: 3f4e2a58-b83f-535e-b19d-ae80c5e867c5
+
+	column PAT_ENC_CSN_ID
+		dataType: string
+		lineageTag: d25d4a13-4e93-50c3-81fe-cb66b56b1314
+		summarizeBy: none
+		sourceColumn: PAT_ENC_CSN_ID
+
+	column PAT_ID
+		dataType: string
+		isHidden
+		lineageTag: 39bf280d-6986-5f3d-88db-2b3c9643168e
+		summarizeBy: none
+		sourceColumn: PAT_ID
+
+	column ENC_TYPE_C
+		dataType: string
+		lineageTag: 51cfee7a-27ec-5bb9-842c-6648acfa7a2e
+		summarizeBy: none
+		sourceColumn: ENC_TYPE_C
+
+	column APPT_STATUS_C
+		dataType: string
+		lineageTag: 874d1505-1cdc-5178-80c5-0a202454b740
+		summarizeBy: none
+		sourceColumn: APPT_STATUS_C
+
+	column DEPARTMENT_ID
+		dataType: string
+		lineageTag: dfe7ab38-f045-5911-94e0-7641a41db7fd
+		summarizeBy: none
+		sourceColumn: DEPARTMENT_ID
+
+	column VISIT_PROV_ID
+		dataType: string
+		isHidden
+		lineageTag: 44ea7b21-e837-5a54-aa06-0ba04dfb7f14
+		summarizeBy: none
+		sourceColumn: VISIT_PROV_ID
+
+	column ENC_CLOSED_YN
+		dataType: string
+		lineageTag: 0f96f270-fd01-5a86-92bf-cde61eac1816
+		summarizeBy: none
+		sourceColumn: ENC_CLOSED_YN
+
+	column EncounterYear
+		dataType: int64
+		lineageTag: da9508e2-c757-5d4e-bc71-e20ef966e945
+		summarizeBy: none
+		sourceColumn: EncounterYear
+
+	column PatientKey
+		dataType: int64
+		isHidden
+		lineageTag: 9a8edfd9-d5fe-594b-bf1f-7479547d24b2
+		summarizeBy: none
+		sourceColumn: PatientKey
+
+	partition gold_safe_fact_clarity_encounter = entity
+		mode: directLake
+		source
+			entityName: gold_safe_fact_clarity_encounter
+			schemaName: dbo
+			expressionSource: DatabaseQuery
