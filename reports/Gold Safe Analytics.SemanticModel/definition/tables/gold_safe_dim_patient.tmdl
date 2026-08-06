@@ -1,6 +1,45 @@
 table gold_safe_dim_patient
 	lineageTag: 6afb9a93-fd73-4ec9-aa99-42600f544bcb
 
+	measure 'Patients' = COUNTROWS ( gold_safe_dim_patient )
+		formatString: #,0
+		displayFolder: KPIs
+		lineageTag: 2f0c1a44-6f2b-4a1e-9a5c-7b3d8e5f1c20
+
+	/// Patients the conformed star matched across BOTH Epic-shaped sources on the shared
+	/// MRN token. These are one row, not two -- so this is a subset of [Patients], never
+	/// an addition to it. If this reads 0 the cross-source join silently failed.
+	measure 'Patients in Both Systems' = ```
+			CALCULATE (
+			    COUNTROWS ( gold_safe_dim_patient ),
+			    gold_safe_dim_patient[SourceSystem] = "Both"
+			)
+			```
+		formatString: #,0
+		displayFolder: KPIs
+		lineageTag: 8d47e2b1-3c9a-4f60-b28e-5a1f6c0d9e33
+
+	/// Share of patients present in both sources, measured against the smaller cohort --
+	/// the same denominator gold_conform.assess_linkage() asserts against at build time.
+	measure 'Cross-Source Match %' = ```
+			VAR Both = [Patients in Both Systems]
+			VAR InCaboodle =
+			    CALCULATE (
+			        COUNTROWS ( gold_safe_dim_patient ),
+			        gold_safe_dim_patient[SourceSystem] IN { "Caboodle", "Both" }
+			    )
+			VAR InClarity =
+			    CALCULATE (
+			        COUNTROWS ( gold_safe_dim_patient ),
+			        gold_safe_dim_patient[SourceSystem] IN { "Clarity", "Both" }
+			    )
+			RETURN
+			    DIVIDE ( Both, MIN ( InCaboodle, InClarity ) )
+			```
+		formatString: 0.0%
+		displayFolder: KPIs
+		lineageTag: c51a9d76-0e84-4b3f-8d17-9f2c4a6b8e05
+
 	column PatientKey
 		dataType: int64
 		isHidden
@@ -14,6 +53,15 @@ table gold_safe_dim_patient
 		lineageTag: da73d989-5e06-4db6-a579-969aa615f78a
 		summarizeBy: none
 		sourceColumn: MRN
+
+	/// The patient's tokenised Clarity identity, populated for Clarity and Both patients
+	/// and blank for Caboodle-only ones. Present so a Clarity fact can be traced back to
+	/// the source record it came from without re-exposing the MRN.
+	column ClarityPatientID
+		dataType: string
+		lineageTag: b3e07f52-8a41-4c96-a0d5-6e29b41f7c8a
+		summarizeBy: none
+		sourceColumn: ClarityPatientID
 
 	column PatientName
 		dataType: string
@@ -69,6 +117,15 @@ table gold_safe_dim_patient
 		lineageTag: b581772a-f8ca-443d-b2a1-8fcafac4496b
 		summarizeBy: none
 		sourceColumn: PCPProviderKey
+
+	/// Which Epic-shaped source the patient came from: Caboodle, Clarity, or Both.
+	/// Patients present in both systems are ONE row, matched on the shared MRN token —
+	/// so slicing by this does not double-count.
+	column SourceSystem
+		dataType: string
+		lineageTag: 3f2b7c14-9a6e-4d51-b8c3-7e05a2f16d84
+		summarizeBy: none
+		sourceColumn: SourceSystem
 
 	partition gold_safe_dim_patient = entity
 		mode: directLake

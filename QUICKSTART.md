@@ -7,8 +7,9 @@
 
 **What you'll build:** a Bronze → Silver → Gold medallion on Microsoft Fabric where the
 Gold layer feeding Power BI and Copilot contains **no PHI by construction**. The final
-notebook (`NB_scorecard`) proves it by asserting **0 of the 18 HIPAA Safe Harbor
-identifiers** survive into Gold.
+notebook (`NB_scorecard`) proves it by asserting that none of the **16 HIPAA identifiers
+present in the bundled schemas** survive into Gold, and by declaring the other two — biometrics
+and full-face photographs — as `NOT_EVALUATED` rather than counting them as passes.
 
 **Time:** ~30–45 min for the synthetic happy path. **Cost:** just your Fabric capacity
 (no Azure Key Vault needed for the synthetic demo).
@@ -79,7 +80,12 @@ the repo's `src/` and `config/` folders into **each** workspace's Lakehouse at
 `Files/accelerator/`.
 
 ### 4. Provide the tokenization pepper
-- **Synthetic demo (easiest):** set the `PHI_DEID_PEPPER` environment variable — no Azure setup.
+- **Synthetic demo (easiest):** nothing to do — the demo notebooks set a committed `DEMO_PEPPER`
+  and acknowledge it via `PHI_DEID_ALLOW_COMPROMISED_PEPPER="synthetic-data-only"`. That pepper is
+  published in this repository, so tokens produced with it are reversible by anyone who can read
+  it; `get_pepper()` refuses the value without that acknowledgement, and the run manifest flags it
+  `-PUBLISHED-COMPROMISED`. **Synthetic data only.** For your own, set `PHI_DEID_PEPPER` to
+  `secrets.token_urlsafe(48)`.
 - **Production:** run [`scripts/provision_keyvault.ps1`](scripts/provision_keyvault.ps1),
   then set `PHI_DEID_KEYVAULT_URL` to your vault URL. See
   [docs/pepper_rotation_runbook.md](docs/pepper_rotation_runbook.md). Never hardcode it.
@@ -94,13 +100,19 @@ and writes the de-identified copy that Analytics reads cross-workspace.
 
 **Pick your HIPAA method (optional).** The accelerator ships both §164.514(b) methods as
 profiles in [`config/deid_rules.yaml`](config/deid_rules.yaml): **Safe Harbor** (dates → year,
-ZIP → 3-digit, age 90+ capped) and **Expert Determination** (per-patient date shift that
-preserves intervals). It uses `active_profile` from that file by default. To switch at run
-time without editing the YAML, set `PROFILE_OVERRIDE = "safe_harbor"` or
-`"expert_determination"` in the selector cell near the top of `02b_silver_deid`.
+ZIP → 3-digit, age 90+ capped and birth years floored to match) and **Expert Determination**
+(per-patient date shift that preserves intervals). It uses `active_profile` from that file by
+default. To switch at run time without editing the YAML, set `PROFILE_OVERRIDE = "safe_harbor"`
+or `"expert_determination"` in the selector cell near the top of `02b_silver_deid`.
+
+> **Note:** the `safe_harbor` profile name describes its column treatments, not the claim you
+> may make. Because it tokenizes MRNs so the two stars stay joinable, the claimable method is
+> **Expert Determination** — see [docs/safe_harbor_mapping.md](docs/safe_harbor_mapping.md).
+> `NB_scorecard` enforces this, so the claim cannot drift.
 
 ### 6. Confirm the proof gate
-`NB_scorecard` asserts **0/18 Safe Harbor identifiers** in `gold_safe_*` and writes a
+`NB_scorecard` asserts the in-scope Safe Harbor identifiers are absent from `gold_safe_*`,
+verifies the claimed de-identification method is one the rulebook supports, and writes a
 PHI-free evidence artifact to `Files/audit/`. Green = the Gold layer is safe for Power BI
 and Copilot.
 

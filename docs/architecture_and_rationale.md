@@ -223,7 +223,9 @@ a new identifier column can never leak by omission.
   (`config_sha256`); the artifact an auditor asks for.
 - **Post-run residual-PHI gate** (`scan_spark_dataframe`) — scans the *output* for
   identifier-shaped values (SSN/phone/email); a clean run scores zero or publish is blocked.
-- **Secret hygiene** — pepper from Key Vault, min-entropy enforced, never printed/logged/stored.
+- **Secret hygiene** — pepper from Key Vault, min-entropy enforced, never printed/logged/stored;
+  the *published* demo pepper is blocklisted by digest and refused unless a run explicitly
+  acknowledges it (see [pepper_rotation_runbook.md](pepper_rotation_runbook.md) §1a).
 
 ---
 

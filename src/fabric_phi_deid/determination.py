@@ -34,9 +34,360 @@ from .privacy_metrics import KAnonymityReport, LDiversityReport, TClosenessRepor
 __all__ = [
     "ResidualScanResult",
     "DeterminationReport",
+    "MethodEligibility",
+    "DerivedValueRule",
+    "RiskAcceptance",
+    "GateOutcome",
+    "SAFE_HARBOR",
+    "EXPERT_DETERMINATION",
+    "DERIVED_VALUE_STRATEGIES",
+    "GATE_PASS",
+    "GATE_ACCEPTED_RISK",
+    "GATE_FAIL",
+    "MIN_ACCEPTANCE_REASON_CHARS",
+    "assess_method_eligibility",
     "build_determination_report",
     "residual_scan_from_hits",
+    "load_risk_acceptance",
+    "evaluate_gate",
 ]
+
+
+SAFE_HARBOR = "safe_harbor"
+EXPERT_DETERMINATION = "expert_determination"
+
+# Strategies whose output is *derived from* the individual's own data rather than removed.
+#
+# This is the crux of the two methods. Safe Harbor (§164.514(b)(2)) is a removal standard,
+# and its re-identification-code exception at §164.514(c)(1) admits a code only when it is
+# "not derived from or related to information about the individual". An HMAC of an MRN is
+# derived from the MRN; a per-patient date shift is derived from the patient's real dates.
+# Identifier (R), "any other unique identifying number, characteristic, or code", is written
+# to catch exactly this, and HHS §3.5 says a code derived from PHI "would have to be removed"
+# under Safe Harbor.
+#
+# HHS §2.9 does permit cryptographic-hash-derived values in a de-identified release --
+# but scopes the permission to the **Expert Determination** method, and only while the keys
+# stay undisclosed. So these strategies do not make output unsafe; they make a *Safe Harbor
+# claim* unavailable. The distinction the scorecard has to enforce is which claim you may make.
+DERIVED_VALUE_STRATEGIES = frozenset({"tokenize", "date_shift"})
+
+
+@dataclass(frozen=True)
+class DerivedValueRule:
+    """One configured rule that emits a value derived from the individual."""
+
+    table: str
+    column: str
+    strategy: str
+
+    def __str__(self) -> str:
+        return f"{self.table}.{self.column} ({self.strategy})"
+
+
+@dataclass
+class MethodEligibility:
+    """Which de-identification method a given rulebook profile may actually claim.
+
+    Computed from the config rather than declared alongside it, for the same reason the
+    semantic model is generated rather than hand-maintained: a declaration can drift out of
+    agreement with the rules it describes, and this one drifts silently into a false
+    compliance claim.
+    """
+
+    profile: str
+    claimed_method: str
+    derived_rules: tuple[DerivedValueRule, ...]
+
+    @property
+    def safe_harbor_available(self) -> bool:
+        """True when no rule emits a value derived from the individual."""
+        return not self.derived_rules
+
+    @property
+    def claimable_method(self) -> str:
+        """The strongest method this configuration actually supports."""
+        return SAFE_HARBOR if self.safe_harbor_available else EXPERT_DETERMINATION
+
+    @property
+    def passes(self) -> bool:
+        """True when the claimed method is supported by the configuration.
+
+        Claiming Expert Determination over a config that would also satisfy Safe Harbor is
+        fine -- it is the weaker claim. The reverse is not.
+        """
+        return not (self.claimed_method == SAFE_HARBOR and not self.safe_harbor_available)
+
+    def summary(self) -> str:
+        verdict = "PASS" if self.passes else "FAIL"
+        if self.passes:
+            detail = f"claim '{self.claimed_method}' is supported by profile '{self.profile}'"
+            if self.derived_rules:
+                detail += f" ({len(self.derived_rules)} derived-value rule(s))"
+        else:
+            shown = ", ".join(str(r) for r in self.derived_rules[:3])
+            more = f" (+{len(self.derived_rules) - 3} more)" if len(self.derived_rules) > 3 else ""
+            detail = (
+                f"profile '{self.profile}' claims Safe Harbor but emits "
+                f"{len(self.derived_rules)} value(s) derived from the individual: "
+                f"{shown}{more}. Per HHS \u00a72.9 these require Expert Determination"
+            )
+        return f"[method-eligibility {verdict}] {detail}"
+
+
+def assess_method_eligibility(
+    cfg: dict[str, Any],
+    *,
+    claimed_method: str,
+    profile: str | None = None,
+) -> MethodEligibility:
+    """Check a claimed de-identification method against what the rulebook actually does.
+
+    Parameters
+    ----------
+    cfg:
+        The loaded ``deid_rules.yaml``.
+    claimed_method:
+        The method the operator intends to assert, e.g. ``"safe_harbor"``. This is a human
+        claim on purpose -- the point of the check is to test an assertion, not to derive one
+        and then agree with itself.
+    profile:
+        Profile to inspect. Defaults to the config's ``active_profile``.
+    """
+    profile = profile or cfg.get("active_profile", "")
+    tables = cfg.get("profiles", {}).get(profile, {}).get("tables", {}) or {}
+
+    derived: list[DerivedValueRule] = []
+    for table, columns in tables.items():
+        for column, rule in (columns or {}).items():
+            strategy = rule if isinstance(rule, str) else (rule or {}).get("strategy")
+            if strategy in DERIVED_VALUE_STRATEGIES:
+                derived.append(DerivedValueRule(table=table, column=column, strategy=strategy))
+
+    return MethodEligibility(
+        profile=profile,
+        claimed_method=claimed_method,
+        derived_rules=tuple(derived),
+    )
+
+
+# --------------------------------------------------------------------------------------
+# Recorded risk acceptance — the only way a failing disclosure-risk gate goes green
+# --------------------------------------------------------------------------------------
+GATE_PASS = "PASS"  # noqa: S105 - a gate verdict, not a credential
+GATE_ACCEPTED_RISK = "ACCEPTED_RISK"
+GATE_FAIL = "FAIL"
+
+# A reason short enough to be a shrug is not an audit record. This floor is arbitrary in its
+# exact value and deliberate in its existence: it stops "ok", "n/a" and "demo" from buying a
+# pass on a re-identification control.
+MIN_ACCEPTANCE_REASON_CHARS = 20
+
+# Substrings that mean the template was never filled in. An unedited placeholder must not be
+# able to sign off on residual re-identification risk.
+_PLACEHOLDER_MARKERS = ("todo", "fixme", "changeme", "change me", "xxx", "<", "tbd")
+
+
+def _placeholder_defect(field_name: str, value: Any) -> str | None:
+    """Return a defect string when ``value`` is missing, blank or an unedited placeholder."""
+    if not isinstance(value, str) or not value.strip():
+        return f"{field_name} is missing or blank"
+    lowered = value.strip().lower()
+    for marker in _PLACEHOLDER_MARKERS:
+        if marker in lowered:
+            return f"{field_name} still contains the placeholder text {marker!r}"
+    return None
+
+
+@dataclass(frozen=True)
+class RiskAcceptance:
+    """A named human's time-limited, written acceptance of a failing disclosure-risk control.
+
+    Why this type exists
+    --------------------
+    Some disclosure-risk controls cannot be satisfied by the data you actually have. A
+    patient-grain table that publishes birth year and 3-digit ZIP will not reach k>=5 on any
+    realistic population — the quasi-identifier domain is simply larger than the cohort. The
+    honest options are to generalize further, to suppress the tail, or to *accept the residual
+    risk*. The third option is legitimate; accepting it silently is not.
+
+    An advisory check and an accepted risk look identical in a green run and are completely
+    different in an audit. This dataclass forces the difference into the evidence artifact: a
+    reason, a person, a scope, and an expiry date. When the acceptance lapses or the placeholder
+    was never edited, the gate fails closed.
+    """
+
+    control: str
+    reason: str
+    accepted_by: str
+    expires_utc: str
+    applies_to: str
+
+    def is_expired(self, as_of: datetime | None = None) -> bool:
+        """True when the acceptance has lapsed. An unparseable date counts as expired."""
+        as_of = as_of or datetime.now(UTC)
+        try:
+            expires = datetime.fromisoformat(self.expires_utc)
+        except (TypeError, ValueError):
+            return True
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=UTC)
+        return as_of >= expires
+
+    def defects(self, as_of: datetime | None = None) -> list[str]:
+        """Every reason this acceptance cannot be relied on (empty list == usable)."""
+        problems: list[str] = []
+        for name, value in (
+            ("reason", self.reason),
+            ("accepted_by", self.accepted_by),
+            ("applies_to", self.applies_to),
+            ("expires_utc", self.expires_utc),
+        ):
+            defect = _placeholder_defect(name, value)
+            if defect:
+                problems.append(defect)
+
+        if isinstance(self.reason, str) and len(self.reason.strip()) < MIN_ACCEPTANCE_REASON_CHARS:
+            problems.append(
+                f"reason is shorter than {MIN_ACCEPTANCE_REASON_CHARS} characters — "
+                "state what was accepted and why"
+            )
+        if self.is_expired(as_of):
+            problems.append(f"acceptance expired on {self.expires_utc}")
+        return problems
+
+    def is_usable(self, as_of: datetime | None = None) -> bool:
+        return not self.defects(as_of)
+
+    def summary(self) -> str:
+        verdict = "usable" if self.is_usable() else "UNUSABLE"
+        return (
+            f"[risk-acceptance {verdict}] {self.control}: accepted by {self.accepted_by!r} "
+            f"for {self.applies_to!r} until {self.expires_utc}"
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "control": self.control,
+            "reason": self.reason,
+            "accepted_by": self.accepted_by,
+            "applies_to": self.applies_to,
+            "expires_utc": self.expires_utc,
+            "expired": self.is_expired(),
+            "usable": self.is_usable(),
+            "defects": self.defects(),
+        }
+
+
+def load_risk_acceptance(cfg: Any, control: str) -> RiskAcceptance | None:
+    """Read ``privacy_gates.<control>.accepted_risk`` out of a loaded config.
+
+    Returns ``None`` when no acceptance is recorded — which is the deny-by-default case, not an
+    error. A malformed block is returned as a ``RiskAcceptance`` with blank fields rather than
+    silently ignored, so ``defects()`` reports it instead of it vanishing into a pass.
+    """
+    if not isinstance(cfg, dict):
+        return None
+    gates = cfg.get("privacy_gates")
+    if not isinstance(gates, dict):
+        return None
+    gate = gates.get(control)
+    if not isinstance(gate, dict):
+        return None
+    accepted = gate.get("accepted_risk")
+    if accepted is None:
+        return None
+    if not isinstance(accepted, dict):
+        accepted = {}
+    return RiskAcceptance(
+        control=control,
+        reason=str(accepted.get("reason", "") or ""),
+        accepted_by=str(accepted.get("accepted_by", "") or ""),
+        expires_utc=str(accepted.get("expires_utc", "") or ""),
+        applies_to=str(accepted.get("applies_to", "") or ""),
+    )
+
+
+@dataclass
+class GateOutcome:
+    """The three-state result of a disclosure-risk control: PASS / ACCEPTED_RISK / FAIL."""
+
+    control: str
+    measured_pass: bool
+    detail: str = ""
+    acceptance: RiskAcceptance | None = None
+    acceptance_defects: tuple[str, ...] = ()
+
+    @property
+    def status(self) -> str:
+        if self.measured_pass:
+            return GATE_PASS
+        if self.acceptance is not None and not self.acceptance_defects:
+            return GATE_ACCEPTED_RISK
+        return GATE_FAIL
+
+    @property
+    def passes(self) -> bool:
+        """True when the gate does not block the run (measured pass OR a valid acceptance)."""
+        return self.status != GATE_FAIL
+
+    def summary(self) -> str:
+        if self.status == GATE_PASS:
+            return f"[{self.control} PASS] {self.detail}".rstrip()
+        if self.status == GATE_ACCEPTED_RISK:
+            assert self.acceptance is not None  # noqa: S101 - narrowed by status
+            return (
+                f"[{self.control} ACCEPTED_RISK] {self.detail} — accepted by "
+                f"{self.acceptance.accepted_by!r} for {self.acceptance.applies_to!r} "
+                f"until {self.acceptance.expires_utc}: {self.acceptance.reason}"
+            )
+        if self.acceptance_defects:
+            return (
+                f"[{self.control} FAIL] {self.detail} — a risk acceptance is recorded but "
+                f"cannot be relied on: {'; '.join(self.acceptance_defects)}"
+            )
+        return (
+            f"[{self.control} FAIL] {self.detail} — no risk acceptance recorded. Generalize "
+            f"further, suppress the small classes, or record privacy_gates.{self.control}."
+            "accepted_risk with a reason, an owner, a scope and an expiry."
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "control": self.control,
+            "status": self.status,
+            "measured_pass": self.measured_pass,
+            "passes": self.passes,
+            "detail": self.detail,
+            "summary": self.summary(),
+            "acceptance": self.acceptance.to_dict() if self.acceptance else None,
+            "acceptance_defects": list(self.acceptance_defects),
+        }
+
+
+def evaluate_gate(
+    control: str,
+    measured_pass: bool,
+    acceptance: RiskAcceptance | None = None,
+    *,
+    detail: str = "",
+    as_of: datetime | None = None,
+) -> GateOutcome:
+    """Combine a measured control result with any recorded acceptance into a gate outcome.
+
+    Deny-by-default: a measurement that fails with no usable acceptance is a ``FAIL`` that
+    blocks the run. This is the difference between a control and a statistic.
+    """
+    defects: tuple[str, ...] = ()
+    if acceptance is not None and not measured_pass:
+        defects = tuple(acceptance.defects(as_of))
+    return GateOutcome(
+        control=control,
+        measured_pass=measured_pass,
+        detail=detail,
+        acceptance=acceptance,
+        acceptance_defects=defects,
+    )
 
 
 @dataclass
@@ -83,6 +434,7 @@ class DeterminationReport:
     l_diversity: LDiversityReport | None
     t_closeness: TClosenessReport | None
     residual_scan: ResidualScanResult | None
+    method_eligibility: MethodEligibility | None = None
     notes: str | None = None
 
     @property
@@ -91,12 +443,16 @@ class DeterminationReport:
 
         A check that was not supplied (``None``) is treated as not-applicable and does not
         block the gate — the reviewer decides which metrics are required for their dataset.
+        The one exception in spirit is ``method_eligibility``: when it *is* supplied it can
+        fail the whole pack on its own, because a pack that asserts an unavailable method is
+        not weak evidence, it is wrong evidence.
         """
         checks = [
             self.k_anonymity.passes if self.k_anonymity else True,
             self.l_diversity.passes if self.l_diversity else True,
             self.t_closeness.passes if self.t_closeness else True,
             self.residual_scan.clean if self.residual_scan else True,
+            self.method_eligibility.passes if self.method_eligibility else True,
         ]
         return all(checks)
 
@@ -163,6 +519,19 @@ class DeterminationReport:
                 if self.residual_scan
                 else None
             ),
+            "method_eligibility": (
+                {
+                    "summary": self.method_eligibility.summary(),
+                    "passes": self.method_eligibility.passes,
+                    "profile": self.method_eligibility.profile,
+                    "claimed_method": self.method_eligibility.claimed_method,
+                    "claimable_method": self.method_eligibility.claimable_method,
+                    "safe_harbor_available": self.method_eligibility.safe_harbor_available,
+                    "derived_value_rules": [str(r) for r in self.method_eligibility.derived_rules],
+                }
+                if self.method_eligibility
+                else None
+            ),
             "notes": self.notes,
         }
 
@@ -187,10 +556,24 @@ class DeterminationReport:
         if expired is not None:
             lines.append(f"- **Review expired:** {'YES' if expired else 'no'}")
         lines += ["", "## Checks", ""]
-        for obj in (self.k_anonymity, self.l_diversity, self.t_closeness, self.residual_scan):
+        for obj in (
+            self.method_eligibility,
+            self.k_anonymity,
+            self.l_diversity,
+            self.t_closeness,
+            self.residual_scan,
+        ):
             if obj is not None:
                 lines.append(f"- {obj.summary()}")
-        if not any((self.k_anonymity, self.l_diversity, self.t_closeness, self.residual_scan)):
+        if not any(
+            (
+                self.method_eligibility,
+                self.k_anonymity,
+                self.l_diversity,
+                self.t_closeness,
+                self.residual_scan,
+            )
+        ):
             lines.append("- _no checks supplied_")
         if self.notes:
             lines += ["", "## Notes", "", self.notes]
@@ -212,6 +595,7 @@ def build_determination_report(
     l_diversity: LDiversityReport | None = None,
     t_closeness: TClosenessReport | None = None,
     residual_scan: ResidualScanResult | None = None,
+    method_eligibility: MethodEligibility | None = None,
     reviewer: str | None = None,
     review_by_utc: str | None = None,
     notes: str | None = None,
@@ -231,6 +615,9 @@ def build_determination_report(
         your dataset; omitted metrics are treated as not-applicable.
     residual_scan : ResidualScanResult, optional
         Aggregate outcome of a residual direct-identifier scan over the de-identified output.
+    method_eligibility : MethodEligibility, optional
+        Result of :func:`assess_method_eligibility` — whether ``method`` is a claim the
+        rulebook actually supports. Supply this whenever you assert a method publicly.
     reviewer, review_by_utc : str, optional
         The qualified reviewer and the (time-limited) review-by date.
     """
@@ -245,6 +632,7 @@ def build_determination_report(
         l_diversity=l_diversity,
         t_closeness=t_closeness,
         residual_scan=residual_scan,
+        method_eligibility=method_eligibility,
         notes=notes,
     )
 

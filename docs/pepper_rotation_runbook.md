@@ -26,6 +26,40 @@ print(secrets.token_urlsafe(48))   # ~64 chars, 288 bits of entropy
 `get_pepper()` rejects secrets shorter than 32 characters (`MIN_PEPPER_LENGTH`) to stop a
 placeholder value from silently weakening the dataset.
 
+## 1a. Why length is the wrong question for the demo pepper
+
+`02b_silver_deid` and `NB_reidentify` ship a `DEMO_PEPPER` literal so the synthetic demo runs
+with no Key Vault. That value is 64 high-entropy characters — it passes the length check
+comfortably, and it would pass any entropy check you could write. **It is still unusable for
+real data**, for a reason no strength check can detect: it is printed in a public Git
+repository, so every deployment of this accelerator shares one key that anyone can read.
+
+That matters more than it first appears. HMAC is one-way, but MRNs are not drawn from a large
+space — they are short, structured, and often sequential. An attacker who holds the pepper can
+tokenize the entire plausible MRN space and invert the mapping by lookup, without ever
+breaking HMAC. The pepper alone does not reverse a token *in general*; over an identifier space
+this small, it effectively does. Tokens keyed on a published pepper are pseudonymous in name
+only.
+
+So `get_pepper()` treats it as a **known-compromised credential rather than a weak one**:
+
+- The demo pepper is blocklisted **by SHA-256 digest** (`_KNOWN_COMPROMISED_PEPPER_SHA256`), so
+  the source file never contains a usable pepper and renaming the variable does not evade the
+  check — the value is what is matched.
+- The check applies to **both** resolution paths. Copying the demo pepper into Key Vault does
+  not launder it.
+- Resolving it raises `ValueError` **unless** the run sets
+  `PHI_DEID_ALLOW_COMPROMISED_PEPPER="synthetic-data-only"`. The acknowledgement is that exact
+  phrase, not a boolean: `=1` is the kind of thing that gets set once in a base image and never
+  reconsidered, whereas writing those words is a claim about the *data*, which is what actually
+  determines whether a shared key is acceptable.
+- When it is used, `pepper_key_version` in the run manifest is suffixed
+  `-PUBLISHED-COMPROMISED`, so the durable audit evidence records it. A waived run must not be
+  indistinguishable from a clean one months later.
+
+**Rotating away from it is not "rotation" — it is step 1 of going to production.** Generate
+your own, put it in Key Vault, and delete the demo cell.
+
 ## 2. Store it in Key Vault (production — Option 1)
 
 > **Adopters:** the one-time vault + secret + role-grant setup is scripted in
@@ -58,7 +92,8 @@ import os, secrets
 os.environ["PHI_DEID_PEPPER"] = secrets.token_urlsafe(48)   # never print this value
 ```
 
-- `get_pepper()` picks this up automatically and still enforces the 32-char minimum.
+- `get_pepper()` picks this up automatically and still enforces the 32-char minimum, and still
+  refuses the published `DEMO_PEPPER` unless the run acknowledges it (§1a).
 - Use the **same** pepper value in `02b_silver_deid` and `NB_reidentify`, or tokens won't
   round-trip. Generate once, set in both notebooks (or as a workspace env var).
 - This path is for synthetic demos only and is **never** used with real PHI.

@@ -6,7 +6,8 @@ sign-off (see docs/pre_real_phi_checklist.md).
 
 Public API
 ----------
-- Tokenization:      tokenize, tokenize_numeric, tokenize_format_preserving, get_pepper
+- Tokenization:      tokenize, tokenize_numeric, tokenize_format_preserving,
+                     normalize_identifier, get_pepper, is_known_compromised_pepper
 - Strategy engine:   apply_strategy, load_rules, resolve_column_strategy, deidentify_table
 - Config integrity:  validate_config, audit_coverage, ConfigValidationError
 - Audit:             config_fingerprint, RunManifest, build_run_manifest, get_audit_logger
@@ -15,11 +16,12 @@ Public API
                      enforce_k_anonymity
 - Free-text NER:     analyze_text, redact_text, scan_texts, NER_AVAILABLE
 - Eval harness:      ClassificationMetrics, evaluate_sets, evaluate_spans
+- Gold conformance:  gold_conform (declarative, Spark-free spec for the gold_safe_* star)
 """
 
 from __future__ import annotations
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 from .audit import (
     RunManifest,
@@ -43,8 +45,14 @@ from .deid_engine import (
     resolve_table_plan,
 )
 from .determination import (
+    DERIVED_VALUE_STRATEGIES,
+    EXPERT_DETERMINATION,
+    SAFE_HARBOR,
+    DerivedValueRule,
     DeterminationReport,
+    MethodEligibility,
     ResidualScanResult,
+    assess_method_eligibility,
     build_determination_report,
     residual_scan_from_hits,
 )
@@ -74,6 +82,8 @@ from .privacy_metrics import (
 )
 from .tokenization import (
     get_pepper,
+    is_known_compromised_pepper,
+    normalize_identifier,
     tokenize,
     tokenize_format_preserving,
     tokenize_numeric,
@@ -86,7 +96,9 @@ __all__ = [
     "tokenize",
     "tokenize_numeric",
     "tokenize_format_preserving",
+    "normalize_identifier",
     "get_pepper",
+    "is_known_compromised_pepper",
     # engine
     "apply_strategy",
     "load_rules",
@@ -119,6 +131,12 @@ __all__ = [
     "SuppressionReport",
     # expert determination evidence pack
     "DeterminationReport",
+    "MethodEligibility",
+    "DerivedValueRule",
+    "SAFE_HARBOR",
+    "EXPERT_DETERMINATION",
+    "DERIVED_VALUE_STRATEGIES",
+    "assess_method_eligibility",
     "ResidualScanResult",
     "build_determination_report",
     "residual_scan_from_hits",

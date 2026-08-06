@@ -56,7 +56,7 @@ flowchart LR
     end
     subgraph ANALYTICS["ANALYTICS workspace (analysts, Copilot)"]
         D -->|cross-workspace| SD[silver_deid_*]
-        SD --> G[gold_safe_*<br/>PHI-free star]
+        SD --> G["gold_safe_*<br/>conformed PHI-free star<br/>Caboodle + Clarity, matched on MRN token"]
         G --> BI[Power BI + Copilot]
         SC{{NB_scorecard<br/>asserts 0/18 identifiers}}
     end
@@ -69,7 +69,16 @@ flowchart LR
 ```
 
 The Gold layer that Power BI and Copilot read contains **no PHI by construction** —
-`NB_scorecard` proves it by asserting **0 of the 18 HIPAA Safe Harbor identifiers** survive.
+`NB_scorecard` proves it by asserting that none of the **16 HIPAA identifiers that exist in
+the bundled schemas** survive. The remaining two — (P) biometric identifiers and (Q) full-face
+photographs — are reported as `NOT_EVALUATED`, because the pipeline reads structured Delta
+tables and has no imaging path: a check that was never run is not a check that passed.
+
+The scorecard also verifies **which HIPAA method you may claim**. The pipeline tokenizes MRNs
+so the de-identified Caboodle and Clarity stars can still join, and an HMAC of an MRN is a
+value derived from the individual — permitted under **Expert Determination** (HHS §2.9) but not
+under Safe Harbor's re-identification-code exception (§164.514(c)(1)). The gate compares the
+claimed method against what the rulebook actually does and fails the run on a mismatch.
 
 ### Auditing and evidence
 
@@ -77,10 +86,20 @@ Every run is auditable — the accelerator does not just transform data, it **pr
 
 - **Direct-identifier gates (hard fail):** no SSN / phone / email patterns, MRN fully
   tokenized, no raw date-of-birth, ZIP ≤ 3 digits. Any failure raises and blocks Gold.
-- **Residual re-identification risk (advisory metrics):** `NB_scorecard` computes
+- **Residual re-identification risk (hard fail, waivable):** `NB_scorecard` measures
   **k-anonymity, l-diversity, and t-closeness** over the quasi-identifier set
   (`BirthYear, Gender, Race, ZIP`) via [`privacy_metrics.py`](src/fabric_phi_deid/privacy_metrics.py)
-  — so you get quantified disclosure risk, not just "the identifiers are gone."
+  and **blocks the run** if a threshold is missed. Re-identification risk is the thing this
+  accelerator exists to manage, so it is not left as a statistic you can ignore.
+  A failing gate has exactly two outcomes: **fix it** (generalize further, or suppress the
+  residual tail with `suppress_quasi_identifiers_spark`) or **sign for it** — record a
+  `accepted_risk` block in [`deid_rules.yaml`](config/deid_rules.yaml) naming a person, a
+  scope, and an expiry date. A waived run reports `PASSED_WITH_ACCEPTED_RISK`, never `PASSED`,
+  and prints the signer in the evidence artifact. An expired, blank, or placeholder acceptance
+  fails closed.
+  > The **shipped demo ships waived** (`accepted_by: "UNSIGNED"`), because k=1 is arithmetically
+  > unavoidable when you publish birth year and 3-digit ZIP at patient grain. That is the point:
+  > you see the real number, and you see that someone has to own it.
 - **Determination governance:** the de-id method, reviewer, and review-by (expiry) date are
   recorded, so an expired Expert Determination is flagged before real PHI is processed.
 - **PHI-free evidence artifact:** each run writes a metadata-only
@@ -121,15 +140,28 @@ Two details worth calling out, because they are judgement calls a generic tool g
   profile parity and "Safe Harbor never emits a full date," so the rulebook cannot drift
   silently.
 
-Gold (`03b`) models the Caboodle star only; `silver_deid_clarity_*` is produced and governed
-but not projected into that star. Conforming it is a **modeling** exercise, not a privacy
-one — everything at that layer is already de-identified.
+Gold (`03b`) conforms **both** schemas into one star. `gold_safe_dim_patient` is a genuinely
+conformed dimension: the two sources are matched on the shared `mrn` token, so a patient in
+both systems is **one row** tagged `SourceSystem = 'Both'`, and a Clarity-only patient gets a
+`PatientKey` minted from that same token — so they keep their key if they later show up in
+Caboodle. Clarity's orders and results have no Caboodle equivalent, so they land as
+`gold_safe_fact_clarity_*` at their own grain and link back through the conformed
+`PatientKey`; forcing them into `fact_encounter` would invent a grain neither source has.
+
+The star's column projections live in
+[`gold_conform.py`](src/fabric_phi_deid/gold_conform.py), not in the notebooks — so the
+PHI-Raw and Analytics copies of `03b` cannot drift apart, and
+[`tests/test_gold_conform.py`](tests/test_gold_conform.py) asserts the whole shape against the
+rulebook **without a Spark session**: every published column is explicitly ruled, none is
+suppressed (a suppressed column would publish as silent nulls), and both MRN columns still
+share one token namespace. Loading only Caboodle is still supported — `03b` detects it and
+builds the Caboodle-only star.
 
 ## Free-text PHI and detector quality
 
 Structured columns are only half the problem — PHI also hides *inside* free-text (clinical
-notes, reason-for-visit, comments). The accelerator detects and removes it, and — critically —
-**measures how well it does so**:
+notes, reason-for-visit, comments). The accelerator detects and removes it, and is explicit
+about **what it has and has not proven** about how well it does so:
 
 - **Detection + redaction** — [`ner_text.py`](src/fabric_phi_deid/ner_text.py) uses
   **Microsoft Presidio** (NER for PERSON / LOCATION / DATE_TIME / SSN / phone / email /
@@ -140,21 +172,29 @@ notes, reason-for-visit, comments). The accelerator detects and removes it, and 
   exercises this for real: `FactEncounter.ReasonForVisitNote` carries synthetic clinical notes
   and is de-identified by the `redact_text` rule in
   [`deid_rules.yaml`](config/deid_rules.yaml) on every Silver run.
-- **Detector quality (recall / precision / F1)** —
-  [`eval_harness.py`](src/fabric_phi_deid/eval_harness.py) scores detectors against a
+- **Structured-identifier coverage (a hard gate)** —
+  [`eval_harness.py`](src/fabric_phi_deid/eval_harness.py) scores the detector against the
   **shipped synthetic labeled corpus** ([`eval_fixtures.py`](src/fabric_phi_deid/eval_fixtures.py))
   at value level (`evaluate_sets` / `evaluate_flags`) and span level (`evaluate_spans`,
-  overlap-based). `NB_scorecard` runs this every time and writes an **actual recall number** for
-  the run into the evidence artifact — so the free-text claim is a *measured metric*, not "it
-  looks clean." Recall is the metric that matters for de-id: a missed identifier is a leak.
+  overlap-based). `NB_scorecard` **fails the run** if the detector misses any *structured*
+  identifier — SSN, phone, email, card, IP, URL, MRN. These are exact-form patterns, so the
+  regex backend either matches them or it is broken, and a miss is a defect rather than a
+  model-quality question.
+- **Recall is deliberately `NOT_EVALUATED`** — and the scorecard says so in writing. The
+  shipped fixtures were authored alongside the detector, so scoring against them measures
+  *self-consistency*, not recall; publishing that ratio as "recall" would overstate what is
+  known. A defensible figure needs an external annotated corpus (i2b2 / n2c2), which is
+  licensed and not redistributable. **If you need a recall number, benchmark it yourself on
+  your own annotated notes** — see [`eval_harness.py`](src/fabric_phi_deid/eval_harness.py).
 
 > Free-text detection is probabilistic. Treat a `[regex-fallback]` posture as
-> **detection-incomplete** — install the `nlp` extra for real notes; the scorecard publishes the
-> run's recall (advisory, never a hard gate).
+> **detection-incomplete**: it catches structured identifiers and *does not* catch contextual
+> ones (names, places, dates). Install the `nlp` extra for real notes — and note that even then
+> the accelerator reports no recall figure it has not earned.
 
 > **When to use something else.** For **free-text- or LLM-prompt-only** redaction (scrub a
 > document or an outbound LLM call), a dedicated text tool such as
-> [Microsoft Presidio](https://github.com/microsoft/presidio) is the mature choice — and this
+> [Microsoft Presidio](https://github.com/data-privacy-stack/presidio) is the mature choice — and this
 > accelerator *uses* Presidio under the hood rather than reinventing it. This project is for the
 > problem those tools don't solve: **de-identifying structured PHI across a Fabric medallion
 > lakehouse** (Bronze → Silver → Gold) in-tenant, with governance, physical de-id, and
@@ -246,10 +286,11 @@ fabric-phi-deid-accelerator/
     03b_gold_safe.ipynb         ← PHI-free star schema → gold_safe_*
     NB_reidentify.ipynb         ← RESTRICTED: token → original value (Vault workspace, ~2 people)
     NB_scorecard.ipynb          ← compliance: 0/18 identifiers + k-anon/l-div/t-closeness + evidence JSON
+    NB_cleanup_gold.ipynb       ← housekeeping: drops gold_safe_* tables the config no longer declares
   sql/
     rls_cls_policies.sql        ← OneLake / Warehouse RLS + CLS (defense-in-depth demo)
   reports/
-    Gold Safe Analytics.SemanticModel/  ← committed Direct Lake model over gold_safe_* (TMDL)
+    Gold Safe Analytics.SemanticModel/  ← committed Direct Lake model over all 17 gold_safe_* tables (TMDL)
     After PHI Deidentified.pbip         ← safe report (byPath to the model — self-contained)
     Before PHI Exposed.pbip / PHI Toggle Demo.pbip  ← unsafe "before" baseline (rebind to your gold_*)
     README.md                   ← rebind steps + which names are examples
@@ -267,7 +308,10 @@ fabric-phi-deid-accelerator/
     demo_runbook.md             ← 5-act demo with 1 admin + 2 user accounts
     pepper_rotation_runbook.md  ← generate / store / rotate the Key Vault pepper
     pre_real_phi_checklist.md   ← the gates that must be signed off BEFORE any real PHI
-  tests/                        ← core, config-validation, audit, residual-PHI, property, Spark
+  tests/                        ← core, config-validation, audit, residual-PHI, property, Spark, semantic-model drift
+  scripts/
+    link_clarity_to_caboodle.py           ← give the two synthetic extracts a shared patient cohort
+    generate_clarity_semantic_tables.py   ← render the Clarity half of the semantic model from gold_conform
   .github/workflows/ci.yml      ← lint + type + test (3.11/3.12) + security (bandit/pip-audit/gitleaks)
   SECURITY.md  CONTRIBUTING.md  CHANGELOG.md  CODEOWNERS  LICENSE
 ```
@@ -334,7 +378,14 @@ output *cross-workspace*, so exactly one physical, PHI-free copy lands in Analyt
 3. Import each notebook into its workspace per the table above (Data Engineering → Import) and
    upload `src/` + `config/` to that workspace's Lakehouse at `Files/accelerator/`.
 4. Provide the tokenization **pepper**:
-   - **Synthetic demo (Option 2):** set the `PHI_DEID_PEPPER` env var — no Azure setup needed.
+   - **Synthetic demo (Option 2):** the demo notebooks already set a committed `DEMO_PEPPER`, so
+     there is nothing to do — but understand what you are agreeing to. That value is published
+     in this repository, so it is the same key in every deployment and anyone can read it. Over
+     an MRN-sized identifier space that is enough to invert the tokens by brute force.
+     `get_pepper()` refuses it unless the run sets
+     `PHI_DEID_ALLOW_COMPROMISED_PEPPER="synthetic-data-only"` (the demo notebooks do), and the
+     run manifest records `pepper_key_version` as `-PUBLISHED-COMPROMISED`. **Synthetic data
+     only.** To use your own instead, set `PHI_DEID_PEPPER` to `secrets.token_urlsafe(48)`.
    - **Production (Option 1):** run
      [`scripts/provision_keyvault.ps1`](scripts/provision_keyvault.ps1) /
      [`scripts/provision_keyvault.sh`](scripts/provision_keyvault.sh) to create the vault,

@@ -1,0 +1,88 @@
+table gold_safe_fact_clarity_admission
+	lineageTag: 515a879d-6a0c-59f0-b507-64493942512c
+
+	measure 'Clarity Admissions' = COUNTROWS ( gold_safe_fact_clarity_admission )
+		formatString: #,0
+		displayFolder: KPIs
+		lineageTag: 005d9113-5829-5a22-9510-3c1748c23f45
+
+	measure 'Avg Length of Stay' = AVERAGE ( gold_safe_fact_clarity_admission[LOS_DAYS] )
+		formatString: 0.0
+		displayFolder: KPIs
+		lineageTag: 9be7d0e3-92af-5ddc-b471-b4eb22befb9b
+
+	column PAT_ENC_CSN_ID
+		dataType: string
+		lineageTag: 096ed6e7-52b0-5e69-b581-61f5f7da0a4a
+		summarizeBy: none
+		sourceColumn: PAT_ENC_CSN_ID
+
+	column PAT_ID
+		dataType: string
+		isHidden
+		lineageTag: 06f3b609-ca4e-5986-826e-2dc94c12db5c
+		summarizeBy: none
+		sourceColumn: PAT_ID
+
+	column ADT_PAT_CLASS
+		dataType: string
+		lineageTag: 7174f58d-0671-5aea-ba1f-1be5a76fb6c2
+		summarizeBy: none
+		sourceColumn: ADT_PAT_CLASS
+
+	column ADMIT_SOURCE_C
+		dataType: string
+		lineageTag: 6b2b4e82-500d-562b-9512-029ccd83cc5c
+		summarizeBy: none
+		sourceColumn: ADMIT_SOURCE_C
+
+	column DISCH_DISP_C
+		dataType: string
+		lineageTag: c6a8ce5f-1e33-550a-9def-39c551e43b8c
+		summarizeBy: none
+		sourceColumn: DISCH_DISP_C
+
+	column DEPARTMENT_ID
+		dataType: string
+		lineageTag: b4e10cec-722c-5bb3-ac14-1b7ae050164a
+		summarizeBy: none
+		sourceColumn: DEPARTMENT_ID
+
+	column ADMISSION_PROV_ID
+		dataType: string
+		isHidden
+		lineageTag: 017dd624-4f78-5e26-bc6f-30972ef33331
+		summarizeBy: none
+		sourceColumn: ADMISSION_PROV_ID
+
+	column LOS_DAYS
+		dataType: int64
+		lineageTag: bc71ee13-db72-5d22-8fbd-37d5d1591ed0
+		summarizeBy: none
+		sourceColumn: LOS_DAYS
+
+	column AdmitYear
+		dataType: int64
+		lineageTag: c6e53100-eb0b-5597-b381-e38712902461
+		summarizeBy: none
+		sourceColumn: AdmitYear
+
+	column DischargeYear
+		dataType: int64
+		lineageTag: 819f13ed-4180-5dfe-8f47-c2309d0ffde6
+		summarizeBy: none
+		sourceColumn: DischargeYear
+
+	column PatientKey
+		dataType: int64
+		isHidden
+		lineageTag: be8ca147-a704-52d0-873d-f5820d6b1e36
+		summarizeBy: none
+		sourceColumn: PatientKey
+
+	partition gold_safe_fact_clarity_admission = entity
+		mode: directLake
+		source
+			entityName: gold_safe_fact_clarity_admission
+			schemaName: dbo
+			expressionSource: DatabaseQuery

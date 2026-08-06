@@ -15,7 +15,8 @@ Harbor de-identification):
 
 - ``tokenize``     : deterministic keyed HMAC token (reversible only via the vault crosswalk)
 - ``synthesize``   : consistent fake-but-realistic value (irreversible, shareable)
-- ``generalize``   : reduce precision — date->year, zip->3-digit, age cap 90+
+- ``generalize``   : reduce precision — date->year, birth date->floored year, zip->3-digit,
+  age cap 90+
 - ``date_shift``   : shift a date by a per-entity consistent offset (preserves intervals)
 - ``suppress``     : drop the value (fail-safe default for unclassified columns)
 - ``passthrough``  : leave the value unchanged (non-PHI columns explicitly allow-listed)
@@ -42,29 +43,35 @@ __all__ = [
     "build_column_expr",
     "deidentify_table",
     "STRATEGIES",
+    "RESTRICTED_ZIP3",
 ]
 
 # --- ZIP prefixes that must be zeroed under HIPAA Safe Harbor (low-population 3-digit
 # --- geographic areas). This is the HHS-published list; kept here for the demo.
-_RESTRICTED_ZIP3 = {
-    "036",
-    "059",
-    "063",
-    "102",
-    "203",
-    "556",
-    "692",
-    "790",
-    "821",
-    "823",
-    "830",
-    "831",
-    "878",
-    "879",
-    "884",
-    "890",
-    "893",
-}
+# Public so verification (NB_scorecard) can assert against the same list the engine applies,
+# rather than re-deriving it and risking a check that is weaker than the transform it checks.
+RESTRICTED_ZIP3 = frozenset(
+    {
+        "036",
+        "059",
+        "063",
+        "102",
+        "203",
+        "556",
+        "692",
+        "790",
+        "821",
+        "823",
+        "830",
+        "831",
+        "878",
+        "879",
+        "884",
+        "890",
+        "893",
+    }
+)
+_RESTRICTED_ZIP3 = RESTRICTED_ZIP3  # backwards-compatible private alias
 
 
 # --------------------------------------------------------------------------------------
@@ -80,26 +87,38 @@ def strat_suppress(value: Any, params: dict, pepper: str) -> Any:
 
 
 def strat_tokenize(value: Any, params: dict, pepper: str) -> Any:
-    if value is None or value == "":
+    """Deterministic keyed token.
+
+    ``strip_separators`` may be set per-column in the rulebook when two source systems
+    write the same identifier with different punctuation (``A12-3456`` vs ``A123456``).
+    It is off unless asked for, because removing separators can merge two genuinely
+    different identifiers -- see tokenization.normalize_identifier.
+    """
+    if value is None or str(value).strip() == "":
         return value
     namespace = params.get("namespace", "default")
+    strip_separators = bool(params.get("strip_separators", False))
     if params.get("format_preserving"):
-        return tokenize_format_preserving(str(value), pepper, namespace=namespace)
+        return tokenize_format_preserving(
+            str(value), pepper, namespace=namespace, strip_separators=strip_separators
+        )
     return tokenize(
         str(value),
         pepper,
         namespace=namespace,
         length=int(params.get("length", 16)),
         prefix=params.get("prefix", ""),
+        strip_separators=strip_separators,
     )
 
 
 def strat_generalize(value: Any, params: dict, pepper: str) -> Any:
     """Reduce precision. ``kind`` selects the generalization:
 
-    - ``year``   : a date -> its 4-digit year (int)
-    - ``zip3``   : a ZIP -> first 3 digits, or "000" if a restricted low-pop prefix
-    - ``age_cap``: an integer age -> capped at 90 (Safe Harbor: 90+ ages aggregated)
+    - ``year``      : a date -> its 4-digit year (int)
+    - ``birth_year``: a BIRTH date -> its year, floored so it cannot imply an age over 89
+    - ``zip3``      : a ZIP -> first 3 digits, or "000" if a restricted low-pop prefix
+    - ``age_cap``   : an integer age -> capped at 90 (Safe Harbor: 90+ ages aggregated)
     """
     if value is None or value == "":
         return value
@@ -108,6 +127,22 @@ def strat_generalize(value: Any, params: dict, pepper: str) -> Any:
     if kind == "year":
         d = _coerce_date(value)
         return d.year if d is not None else None
+
+    if kind == "birth_year":
+        # Safe Harbor §164.514(b)(2)(i)(C) removes ages over 89 *and* "all elements of dates
+        # (including year) indicative of such age". Capping Age at 90 while publishing a true
+        # birth year does not satisfy that: the year reconstructs the age the cap removed.
+        # So every birth year old enough to imply 90+ collapses into one bucket, matching HHS's
+        # worked example (born 1910, seen 2010 -> report "on or before 1920").
+        d = _coerce_date(value)
+        if d is None:
+            return None
+        cap = int(params.get("cap_age", 90))
+        # reference_year pins the bucket so output is reproducible; left unset it tracks the
+        # current year, which is correct for a live run but makes stored output drift over time.
+        reference_year = params.get("reference_year")
+        ref = int(reference_year) if reference_year else _dt.datetime.now(_dt.UTC).year
+        return max(d.year, ref - cap)
 
     if kind == "zip3":
         digits = "".join(ch for ch in str(value) if ch.isdigit())
@@ -296,7 +331,7 @@ def build_column_expr(column: str, strategy: str, params: dict, pepper: str):
     from pyspark.sql import types as T  # type: ignore
 
     # Result type depends on strategy; generalize->year returns int, date_shift returns date.
-    if strategy == "generalize" and params.get("kind") == "year":
+    if strategy == "generalize" and params.get("kind") in {"year", "birth_year"}:
         return_type: Any = T.IntegerType()
     elif strategy == "generalize" and params.get("kind") == "age_cap":
         return_type = T.IntegerType()

@@ -1,0 +1,64 @@
+table gold_safe_fact_clarity_diagnosis
+	lineageTag: dfd78b93-92b6-5c29-a607-efc01ca96fae
+
+	measure 'Clarity Diagnoses' = COUNTROWS ( gold_safe_fact_clarity_diagnosis )
+		formatString: #,0
+		displayFolder: KPIs
+		lineageTag: e8a31672-5bff-5e0a-aa79-3b70d8fc6382
+
+	column PAT_ENC_CSN_ID
+		dataType: string
+		lineageTag: 86953cd0-0c35-5eb4-a71a-bd102c83bb29
+		summarizeBy: none
+		sourceColumn: PAT_ENC_CSN_ID
+
+	column PAT_ID
+		dataType: string
+		isHidden
+		lineageTag: a2e7d64e-1e47-55ff-a129-c88e2d1c83d7
+		summarizeBy: none
+		sourceColumn: PAT_ID
+
+	column LINE
+		dataType: int64
+		lineageTag: 40aeee4c-9f34-5248-8725-e05bf3d89a1f
+		summarizeBy: none
+		sourceColumn: LINE
+
+	column DX_ID
+		dataType: string
+		lineageTag: 8bd47606-0f3d-5db9-998f-799eb8c718d9
+		summarizeBy: none
+		sourceColumn: DX_ID
+
+	column PRIMARY_DX_YN
+		dataType: string
+		lineageTag: cd169f51-48d3-52b3-859b-a995f6b638dc
+		summarizeBy: none
+		sourceColumn: PRIMARY_DX_YN
+
+	column DX_ED_YN_C
+		dataType: string
+		lineageTag: 1fd0cf5f-7512-53e3-8754-9d83fd62d9c6
+		summarizeBy: none
+		sourceColumn: DX_ED_YN_C
+
+	column ContactYear
+		dataType: int64
+		lineageTag: 96c0e438-c413-5757-81e2-766f6ca613d2
+		summarizeBy: none
+		sourceColumn: ContactYear
+
+	column PatientKey
+		dataType: int64
+		isHidden
+		lineageTag: a7045c0b-772b-5465-9b57-e7eae7383f72
+		summarizeBy: none
+		sourceColumn: PatientKey
+
+	partition gold_safe_fact_clarity_diagnosis = entity
+		mode: directLake
+		source
+			entityName: gold_safe_fact_clarity_diagnosis
+			schemaName: dbo
+			expressionSource: DatabaseQuery

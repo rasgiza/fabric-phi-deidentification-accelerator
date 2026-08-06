@@ -64,7 +64,9 @@ src = ["src", "tests"]
 # Fabric notebooks run under a runtime that injects globals (``spark``, ``notebookutils``)
 # and are exported as .ipynb; they are validated by execution in Fabric, not by the package
 # lint gate. Exclude them so CI reflects the installable package + tests only.
-extend-exclude = ["notebooks"]
+# The glob matters: PHI_Deid_Launcher.ipynb sits at the repo root, so a `notebooks`-only
+# exclude let the formatter rewrite a notebook that had already been proven in Fabric.
+extend-exclude = ["notebooks", "*.ipynb"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "S"]

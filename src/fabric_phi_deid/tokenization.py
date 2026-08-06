@@ -22,6 +22,17 @@ Design principles
 The `namespace` argument prevents cross-column collisions and cross-linkage: an MRN and
 a provider NPI that happen to share a string value will NOT produce the same token,
 because each column tokenizes under its own namespace.
+
+Normalization
+-------------
+HMAC is exact: one differing byte produces a completely unrelated token. That is the
+whole point for security, and a trap for record linkage. If Caboodle stores an MRN as
+``MRN00001234`` and Clarity stores the same patient as ``mrn00001234`` or
+``" MRN00001234 "``, tokenizing them raw yields two unrelated tokens, the conformed
+dimension silently matches **nothing**, and the failure looks like "these systems just
+don't overlap" rather than a bug. Every value is therefore passed through
+:func:`normalize_identifier` before hashing. This mirrors what an EMPI does before
+comparing identifiers, and it is why normalization is on by default rather than opt-in.
 """
 
 from __future__ import annotations
@@ -29,15 +40,21 @@ from __future__ import annotations
 import hashlib
 import hmac
 import os
+import re
 import string
+from typing import overload
 
 __all__ = [
     "tokenize",
     "tokenize_numeric",
     "tokenize_format_preserving",
+    "normalize_identifier",
     "get_pepper",
+    "is_known_compromised_pepper",
     "KEYVAULT_URL_ENV",
     "PEPPER_ENV",
+    "ALLOW_COMPROMISED_PEPPER_ENV",
+    "COMPROMISED_PEPPER_ACK",
     "DEFAULT_SECRET_NAME",
     "MIN_PEPPER_LENGTH",
 ]
@@ -63,20 +80,130 @@ PEPPER_ENV = "PHI_DEID_PEPPER"  # noqa: S105 - name of an env var, not a secret 
 # token in the dataset. Generate with e.g. ``secrets.token_urlsafe(48)``.
 MIN_PEPPER_LENGTH = 32
 
+# --- known-compromised peppers ------------------------------------------------------------
+# Length is a proxy for entropy, and entropy is the WRONG question for a value that has been
+# published. The demo pepper in this repository's notebooks is 64 high-entropy characters, so
+# it sails through every strength check -- and it is printed in a public Git repository, which
+# means every deployment that uses it shares one key that anyone can read. MRNs come from a
+# small, structured space (`MRN00000001`...), so an attacker holding the pepper can simply
+# tokenize the whole space and invert the mapping by lookup. That reduces the tokens from
+# "irreversible without the crosswalk" to "reversible by anyone", which is the single claim
+# this module exists to make.
+#
+# Stored as SHA-256 digests rather than literals so this file never contains a usable pepper
+# and secret scanners have nothing to flag. This is the same pattern as a compromised-credential
+# blocklist: the check is "is this the known-bad value", not "is this value strong".
+_KNOWN_COMPROMISED_PEPPER_SHA256 = frozenset(
+    {
+        # notebooks/02b_silver_deid.ipynb + notebooks/NB_reidentify.ipynb DEMO_PEPPER
+        "14c7fbd7511313ce63c5247a8617e61baefa92c88ad45823e281c55c33955887",
+    }
+)
 
-def _hmac_digest(pepper: str, namespace: str, value: str) -> bytes:
+# Opt-in acknowledgement for the synthetic demo. Deliberately NOT a boolean: `=1` or `=true`
+# is the kind of thing that gets set once in a base image and never reconsidered, whereas
+# writing the words below is a statement about the DATA, which is the thing that actually
+# determines whether a shared pepper is acceptable.
+ALLOW_COMPROMISED_PEPPER_ENV = "PHI_DEID_ALLOW_COMPROMISED_PEPPER"
+COMPROMISED_PEPPER_ACK = "synthetic-data-only"  # noqa: S105 - an acknowledgement phrase
+
+
+def is_known_compromised_pepper(pepper: str | None) -> bool:
+    """Return True if `pepper` is a published value from this repository's demos.
+
+    Compared by digest in constant time. A published pepper is not weak; it is *shared*,
+    which is a different and worse failure mode that no strength check detects.
+    """
+    if not pepper:
+        return False
+    digest = hashlib.sha256(pepper.encode("utf-8")).hexdigest()
+    return any(hmac.compare_digest(digest, known) for known in _KNOWN_COMPROMISED_PEPPER_SHA256)
+
+
+# Internal runs of whitespace collapse to a single space before comparison; separators are
+# only removed when the caller asks for it (see normalize_identifier).
+_WHITESPACE_RE = re.compile(r"\s+")
+_SEPARATOR_RE = re.compile(r"[^A-Z0-9]")
+
+
+# Overloads keep the None-passthrough convenience without forcing every caller that
+# already holds a `str` to re-narrow the result.
+@overload
+def normalize_identifier(value: str, *, strip_separators: bool = False) -> str: ...
+
+
+@overload
+def normalize_identifier(value: None, *, strip_separators: bool = False) -> None: ...
+
+
+def normalize_identifier(value: str | None, *, strip_separators: bool = False) -> str | None:
+    """Canonicalise an identifier so cosmetic differences don't break linkage.
+
+    Applies the conservative normalization an EMPI does before comparing identifiers:
+    collapse internal whitespace, trim, and upper-case. ``None`` is returned unchanged.
+
+    Parameters
+    ----------
+    strip_separators : bool
+        Also remove every non-alphanumeric character, so ``A12-3456`` and ``A123456``
+        canonicalise identically. This is **off by default** because it is a lossy,
+        judgement-dependent step: in some assigning authorities the separator is
+        meaningful and removing it can merge two genuinely different patients. Turn it on
+        only when you have confirmed the source systems disagree purely on punctuation.
+
+    Notes
+    -----
+    Deliberately NOT done here: stripping leading zeros, and dropping alphabetic prefixes
+    such as ``MRN``. Both are real-world normalizations, but both can collapse distinct
+    identifiers, and a false-positive patient merge is a patient-safety event, not a data
+    quality one. Under-normalizing produces a missed match, which the linkage-yield check
+    surfaces loudly; over-normalizing produces a wrong match, which nothing catches.
+    """
+    if value is None:
+        return value
+    text = _WHITESPACE_RE.sub(" ", str(value)).strip().upper()
+    if strip_separators:
+        text = _SEPARATOR_RE.sub("", text)
+    return text
+
+
+def _hmac_digest(
+    pepper: str,
+    namespace: str,
+    value: str,
+    *,
+    normalize: bool = True,
+    strip_separators: bool = False,
+) -> bytes:
     """Return the raw HMAC-SHA256 digest for (namespace, value) under `pepper`.
 
     The namespace is bound into the message with a separator that cannot appear in a
     typical identifier, so ("mrn", "123") and ("mr", "n123") cannot collide.
+
+    The value is normalized first (see :func:`normalize_identifier`) so that the same
+    patient tokenizes identically across source systems that differ only in case or
+    padding. Pass ``normalize=False`` for values where the exact bytes are semantically
+    significant.
     """
     if pepper is None or pepper == "":
         raise ValueError(
             "A non-empty pepper is required. Fetch it from Key Vault via get_pepper(); "
             "never call tokenize() with an empty or hardcoded pepper."
         )
+    if normalize:
+        value = normalize_identifier(value, strip_separators=strip_separators)
     message = f"{namespace}\x1f{value}".encode()
     return hmac.new(pepper.encode("utf-8"), message, hashlib.sha256).digest()
+
+
+def _is_blank(value: str | None) -> bool:
+    """True when a value carries no identifier at all.
+
+    Whitespace-only is treated as missing rather than as an identifier: tokenizing "   "
+    would mint a real-looking token for a blank field and, worse, give every blank field
+    in the dataset the *same* token — an accidental join key linking unrelated patients.
+    """
+    return value is None or str(value).strip() == ""
 
 
 def tokenize(
@@ -85,14 +212,17 @@ def tokenize(
     namespace: str = "default",
     length: int = 16,
     prefix: str = "",
+    *,
+    normalize: bool = True,
+    strip_separators: bool = False,
 ) -> str | None:
     """Deterministically tokenize a string value.
 
     Parameters
     ----------
     value : str | None
-        The clear value to tokenize. ``None`` and empty string pass through as-is so that
-        missing data is not turned into a spurious token.
+        The clear value to tokenize. ``None``, empty and whitespace-only values pass
+        through as-is so that missing data is not turned into a spurious token.
     pepper : str
         Secret key from Key Vault. Required; must be non-empty.
     namespace : str
@@ -102,15 +232,23 @@ def tokenize(
         digest, which is ample for uniqueness at healthcare row counts.
     prefix : str
         Optional human-readable prefix, e.g. "PT-" -> "PT-a1b2c3d4...".
+    normalize : bool
+        Canonicalise the value before hashing (see :func:`normalize_identifier`) so the
+        same identifier tokenizes identically across source systems that differ only in
+        case or padding. Defaults to True.
+    strip_separators : bool
+        Passed to :func:`normalize_identifier`. Off by default.
 
     Returns
     -------
     str | None
-        The token, or the original None/empty value unchanged.
+        The token, or the original missing value unchanged.
     """
-    if value is None or value == "":
+    if _is_blank(value):
         return value
-    digest = _hmac_digest(pepper, namespace, str(value))
+    digest = _hmac_digest(
+        pepper, namespace, str(value), normalize=normalize, strip_separators=strip_separators
+    )
     token = digest.hex()[:length]
     return f"{prefix}{token}"
 
@@ -120,15 +258,20 @@ def tokenize_numeric(
     pepper: str,
     namespace: str = "default",
     digits: int = 10,
+    *,
+    normalize: bool = True,
+    strip_separators: bool = False,
 ) -> str | None:
     """Tokenize to a fixed-length numeric string (useful for numeric-looking IDs).
 
-    Produces a zero-padded decimal string derived from the HMAC digest. Deterministic
-    and namespace-scoped like :func:`tokenize`.
+    Produces a zero-padded decimal string derived from the HMAC digest. Deterministic,
+    namespace-scoped and normalized like :func:`tokenize`.
     """
-    if value is None or value == "":
+    if _is_blank(value):
         return value
-    digest = _hmac_digest(pepper, namespace, str(value))
+    digest = _hmac_digest(
+        pepper, namespace, str(value), normalize=normalize, strip_separators=strip_separators
+    )
     as_int = int.from_bytes(digest[:8], "big") % (10**digits)
     return str(as_int).zfill(digits)
 
@@ -137,6 +280,9 @@ def tokenize_format_preserving(
     value: str | None,
     pepper: str,
     namespace: str = "default",
+    *,
+    normalize: bool = True,
+    strip_separators: bool = False,
 ) -> str | None:
     """Tokenize while preserving length and per-character class (digit/upper/lower).
 
@@ -145,13 +291,20 @@ def tokenize_format_preserving(
     the token keeps the original shape — handy when a downstream schema expects a
     specific pattern (e.g. an MRN like ``A12-3456`` -> ``Q83-9017``).
 
+    The digest is taken over the *normalized* value (so linkage survives cosmetic
+    differences) while the shape is taken from the *original* value (so the format
+    contract is honoured). Two source systems that differ only in case therefore produce
+    the same character sequence, each in its own casing.
+
     Note: format-preserving tokens carry length/shape information. For maximum
     de-identification prefer plain :func:`tokenize`. This variant is offered for cases
     where a format constraint must be met.
     """
-    if value is None or value == "":
+    if _is_blank(value):
         return value
-    digest = _hmac_digest(pepper, namespace, str(value))
+    digest = _hmac_digest(
+        pepper, namespace, str(value), normalize=normalize, strip_separators=strip_separators
+    )
     out_chars: list[str] = []
     for i, ch in enumerate(str(value)):
         b = digest[i % len(digest)]
@@ -245,15 +398,36 @@ def get_pepper(
 
 
 def _validate_pepper(pepper: str | None, min_length: int) -> str:
-    """Return `pepper` if it meets the minimum-entropy length bar, else raise.
+    """Return `pepper` if it is usable, else raise.
 
-    Applied to every resolution path so a weak/placeholder value can never silently
-    weaken tokenization regardless of whether it came from an env var or Key Vault.
+    Applied to every resolution path so a weak, placeholder, or *published* value can never
+    silently weaken tokenization regardless of whether it came from an env var or Key Vault.
+
+    Two distinct failures are checked, because they are not the same problem:
+
+    - **Too short** — probably a placeholder; low entropy makes the token guessable.
+    - **Known-compromised** — high entropy, but published in this repository, so every
+      deployment using it shares a key that anyone can read. No strength check catches this.
     """
     if pepper is None or len(pepper) < min_length:
         raise ValueError(
             f"Resolved pepper is too short (< {min_length} chars). A production pepper "
             "must be a high-entropy secret; regenerate with secrets.token_urlsafe(48). "
             "Refusing to tokenize with a weak/placeholder pepper."
+        )
+    if is_known_compromised_pepper(pepper) and (
+        os.environ.get(ALLOW_COMPROMISED_PEPPER_ENV) != COMPROMISED_PEPPER_ACK
+    ):
+        raise ValueError(
+            "Refusing to tokenize with the published demo pepper. This value appears in "
+            "this repository's notebooks, so it is identical across every deployment and "
+            "readable by anyone. Because MRNs come from a small structured space, holding "
+            "the pepper is enough to invert the tokens by brute force -- the data would be "
+            "pseudonymous in name only.\n"
+            "  For REAL data: generate your own with secrets.token_urlsafe(48) and store it "
+            f"in Key Vault (see docs/pepper_rotation_runbook.md); set {KEYVAULT_URL_ENV}.\n"
+            "  For SYNTHETIC data only: set "
+            f'{ALLOW_COMPROMISED_PEPPER_ENV}="{COMPROMISED_PEPPER_ACK}" to acknowledge that '
+            "the tokens in this run are reversible by anyone."
         )
     return pepper
