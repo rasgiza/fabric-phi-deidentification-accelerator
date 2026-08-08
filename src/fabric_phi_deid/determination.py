@@ -37,6 +37,7 @@ __all__ = [
     "MethodEligibility",
     "DerivedValueRule",
     "RiskAcceptance",
+    "ActualKnowledgeAttestation",
     "GateOutcome",
     "SAFE_HARBOR",
     "EXPERT_DETERMINATION",
@@ -45,10 +46,12 @@ __all__ = [
     "GATE_ACCEPTED_RISK",
     "GATE_FAIL",
     "MIN_ACCEPTANCE_REASON_CHARS",
+    "MIN_ATTESTATION_STATEMENT_CHARS",
     "assess_method_eligibility",
     "build_determination_report",
     "residual_scan_from_hits",
     "load_risk_acceptance",
+    "load_actual_knowledge_attestation",
     "evaluate_gate",
 ]
 
@@ -70,7 +73,41 @@ EXPERT_DETERMINATION = "expert_determination"
 # but scopes the permission to the **Expert Determination** method, and only while the keys
 # stay undisclosed. So these strategies do not make output unsafe; they make a *Safe Harbor
 # claim* unavailable. The distinction the scorecard has to enforce is which claim you may make.
-DERIVED_VALUE_STRATEGIES = frozenset({"tokenize", "date_shift"})
+#
+# ``synthesize`` is on this list because of how it is IMPLEMENTED, not because a synthetic
+# value is inherently derived. :func:`deid_engine.strat_synthesize` HMACs the source value and
+# indexes a name list with the digest, so the same real name always yields the same fake one --
+# a consistent, pepper-keyed pseudonym derived from the individual's name. The output space is
+# small enough (256 full-name combinations) that it is a poor re-identifier, but HHS §3.2 is
+# explicit that even patient *initials* fail Safe Harbor, so "derived but lossy" is not a
+# category the rule recognises. Swap in a generator that ignores the input value and this
+# entry should come off the list.
+#
+# ``surrogate`` is deliberately ABSENT, and it is the one omission worth defending. It does the
+# same job as ``tokenize`` -- a stable per-patient key that conforms two source systems -- but
+# :func:`deid_engine.strat_surrogate` looks the value up in a mapping minted from a CSPRNG by
+# :func:`crosswalk.mint_crosswalk`, so the code carries no information about the individual and
+# cannot be recomputed from their data by anyone, including us. That is precisely the case
+# §164.514(c) was written to allow ("may assign a code ... not derived from or related to
+# information about the individual"), and it is what lets a Safe Harbor profile link across
+# source systems at all. The security half of §164.514(c) is not a code property and cannot be
+# checked here: it is the Vault's job to keep the mapping away from the analytics workspace.
+DERIVED_VALUE_STRATEGIES = frozenset({"tokenize", "date_shift", "synthesize"})
+
+
+def _derived_strategy_label(strategy: str | None, params: dict[str, Any]) -> str | None:
+    """Return a label when this rule emits a value derived from the individual, else ``None``.
+
+    The strategy name alone cannot answer this for every rule. ``redact_text`` replaces each
+    detected span with either an entity *label* (``<NAME>``) or a *token* derived from the span,
+    and only the second is a derived value -- so the parameters have to be read too. Checking
+    the name and stopping is how a config sneaks a pseudonym past a Safe Harbor claim.
+    """
+    if strategy in DERIVED_VALUE_STRATEGIES:
+        return strategy
+    if strategy == "redact_text" and params.get("replacement") == "token":
+        return "redact_text(replacement=token)"
+    return None
 
 
 @dataclass(frozen=True)
@@ -160,9 +197,17 @@ def assess_method_eligibility(
     derived: list[DerivedValueRule] = []
     for table, columns in tables.items():
         for column, rule in (columns or {}).items():
-            strategy = rule if isinstance(rule, str) else (rule or {}).get("strategy")
-            if strategy in DERIVED_VALUE_STRATEGIES:
-                derived.append(DerivedValueRule(table=table, column=column, strategy=strategy))
+            strategy: str | None
+            params: dict[str, Any]
+            if isinstance(rule, str):
+                strategy, params = rule, {}
+            else:
+                rule = rule or {}
+                strategy = rule.get("strategy")
+                params = {k: v for k, v in rule.items() if k != "strategy"}
+            label = _derived_strategy_label(strategy, params)
+            if label is not None:
+                derived.append(DerivedValueRule(table=table, column=column, strategy=label))
 
     return MethodEligibility(
         profile=profile,
@@ -305,6 +350,144 @@ def load_risk_acceptance(cfg: Any, control: str) -> RiskAcceptance | None:
         accepted_by=str(accepted.get("accepted_by", "") or ""),
         expires_utc=str(accepted.get("expires_utc", "") or ""),
         applies_to=str(accepted.get("applies_to", "") or ""),
+    )
+
+
+# --------------------------------------------------------------------------------------
+# Safe Harbor prong (ii) — §164.514(b)(2)(ii), actual knowledge
+# --------------------------------------------------------------------------------------
+# Safe Harbor has TWO conditions, and almost every implementation ships only the first.
+#
+#   (i)  remove the 18 enumerated identifiers, AND
+#   (ii) "the covered entity does not have actual knowledge that the information could be
+#        used alone or in combination with other information to identify an individual who
+#        is a subject of the information."
+#
+# Prong (ii) is not a data property. No scan can establish it, because it is a statement
+# about what the covered entity *knows* — that the only oncologist in a 3-digit ZIP is
+# identifiable from specialty alone, that a dataset was already published with a joinable
+# key, that a rare diagnosis code names one person. Software cannot see any of that.
+#
+# What software CAN do is refuse to let the claim be made silently. Deleting eighteen
+# columns is the part that automates; knowing your own data is the part that does not, and
+# a pipeline that reports "Safe Harbor: PASS" while covering only prong (i) is overstating
+# its own evidence. So this ships UNSIGNED and fails closed: a human puts their name to it,
+# scoped and time-limited, or the scorecard does not certify Safe Harbor.
+MIN_ATTESTATION_STATEMENT_CHARS = 80
+
+
+@dataclass(frozen=True)
+class ActualKnowledgeAttestation:
+    """A named human's time-limited attestation to §164.514(b)(2)(ii).
+
+    Deliberately shaped like :class:`RiskAcceptance`: a statement, a person, a scope, an
+    expiry, and the same placeholder detection. The two are the only places in this
+    accelerator where a human judgement outranks a measurement, and they should look and
+    fail alike.
+    """
+
+    statement: str
+    attested_by: str
+    role: str
+    applies_to: str
+    attested_utc: str
+    expires_utc: str
+    residual_risks: tuple[str, ...] = ()
+
+    def is_expired(self, as_of: datetime | None = None) -> bool:
+        """True when the attestation has lapsed. An unparseable date counts as expired.
+
+        Expiry is not bureaucracy. Actual knowledge is a statement about a moment: the
+        estate acquires new datasets, publishes new extracts, and a judgement that was
+        sound in March can be wrong by September without anything in *this* pipeline
+        changing. An attestation with no end date is a claim that nothing will ever be
+        learned again.
+        """
+        as_of = as_of or datetime.now(UTC)
+        try:
+            expires = datetime.fromisoformat(self.expires_utc)
+        except (TypeError, ValueError):
+            return True
+        if expires.tzinfo is None:
+            expires = expires.replace(tzinfo=UTC)
+        return as_of >= expires
+
+    def defects(self, as_of: datetime | None = None) -> list[str]:
+        """Every reason this attestation cannot be relied on (empty list == usable)."""
+        problems: list[str] = []
+        for name, value in (
+            ("statement", self.statement),
+            ("attested_by", self.attested_by),
+            ("role", self.role),
+            ("applies_to", self.applies_to),
+            ("expires_utc", self.expires_utc),
+        ):
+            defect = _placeholder_defect(name, value)
+            if defect:
+                problems.append(defect)
+
+        if (
+            isinstance(self.statement, str)
+            and len(self.statement.strip()) < MIN_ATTESTATION_STATEMENT_CHARS
+        ):
+            problems.append(
+                f"statement is shorter than {MIN_ATTESTATION_STATEMENT_CHARS} characters — "
+                "name the datasets considered and the residual risks reviewed"
+            )
+        if self.is_expired(as_of):
+            problems.append(f"attestation expired on {self.expires_utc}")
+        return problems
+
+    def is_usable(self, as_of: datetime | None = None) -> bool:
+        return not self.defects(as_of)
+
+    def summary(self) -> str:
+        verdict = "usable" if self.is_usable() else "UNSIGNED/UNUSABLE"
+        return (
+            f"[actual-knowledge {verdict}] attested by {self.attested_by!r} ({self.role}) "
+            f"for {self.applies_to!r} until {self.expires_utc}"
+        )
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "statement": self.statement,
+            "attested_by": self.attested_by,
+            "role": self.role,
+            "applies_to": self.applies_to,
+            "attested_utc": self.attested_utc,
+            "expires_utc": self.expires_utc,
+            "residual_risks": list(self.residual_risks),
+            "expired": self.is_expired(),
+            "usable": self.is_usable(),
+            "defects": self.defects(),
+        }
+
+
+def load_actual_knowledge_attestation(cfg: Any) -> ActualKnowledgeAttestation | None:
+    """Read the top-level ``actual_knowledge`` block out of a loaded config.
+
+    Returns ``None`` only when the block is absent entirely — which the scorecard must
+    treat as a FAIL for a Safe Harbor claim, not as "nothing to check". A malformed block
+    comes back with blank fields so ``defects()`` reports it rather than it vanishing.
+    """
+    if not isinstance(cfg, dict):
+        return None
+    block = cfg.get("actual_knowledge")
+    if block is None:
+        return None
+    if not isinstance(block, dict):
+        block = {}
+    risks = block.get("residual_risks") or ()
+    if isinstance(risks, str):
+        risks = (risks,)
+    return ActualKnowledgeAttestation(
+        statement=str(block.get("statement", "") or ""),
+        attested_by=str(block.get("attested_by", "") or ""),
+        role=str(block.get("role", "") or ""),
+        applies_to=str(block.get("applies_to", "") or ""),
+        attested_utc=str(block.get("attested_utc", "") or ""),
+        expires_utc=str(block.get("expires_utc", "") or ""),
+        residual_risks=tuple(str(r) for r in risks),
     )
 
 

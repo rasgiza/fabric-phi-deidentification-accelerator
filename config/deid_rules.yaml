@@ -59,6 +59,42 @@ active_profile: safe_harbor
 # Option 3 is legitimate. Accepting it SILENTLY is not, which is why every field is
 # required and an unedited placeholder fails the gate closed.
 # =====================================================================================
+# =====================================================================================
+# SAFE HARBOR PRONG (ii) -- 164.514(b)(2)(ii), ACTUAL KNOWLEDGE
+#
+# Safe Harbor is TWO conditions, and almost every implementation ships only the first:
+#   (i)  remove the 18 enumerated identifiers, AND
+#   (ii) the covered entity "does not have actual knowledge that the information could be
+#        used alone or in combination with other information to identify an individual who
+#        is a subject of the information."
+#
+# No scan can establish (ii). It is a statement about what YOU know -- that the only
+# paediatric transplant surgeon in a 3-digit ZIP is identifiable from specialty alone; that
+# this cohort was already published elsewhere with a joinable key; that a rare diagnosis
+# code names exactly one person in your population. None of that is visible to a pipeline.
+#
+# So this block ships UNSIGNED, and NB_scorecard FAILS any Safe Harbor claim until a named
+# human fills it in. That is deliberate. Deleting eighteen columns is the part that
+# automates; knowing your own data is the part that does not, and a tool reporting
+# "Safe Harbor: PASS" on prong (i) alone is overstating its own evidence.
+#
+# NOT required for an Expert Determination claim: prong (ii) is Safe Harbor-specific,
+# because the expert's risk analysis under 164.514(b)(1) already subsumes it.
+# =====================================================================================
+actual_knowledge:
+  statement: "TODO -- state which other datasets held by this organisation were considered
+    for combination with this release, which residual risks were reviewed (small cells,
+    rare diagnoses, single-provider specialties, previously published extracts), and why
+    the remaining data is not reasonably identifiable. Minimum 80 characters, because a
+    one-line attestation is a signature on nothing."
+  attested_by: "TODO -- full name of the individual attesting"
+  role: "TODO -- e.g. Privacy Officer, Chief Compliance Officer"
+  applies_to: "TODO -- which release/tables this attestation covers"
+  attested_utc: "TODO -- YYYY-MM-DD"
+  expires_utc: "TODO -- YYYY-MM-DD (actual knowledge is a statement about a MOMENT; the
+    estate acquires new datasets and a sound judgement in March can be wrong by September)"
+  residual_risks: []      # optional: free-text risks reviewed and consciously accepted
+
 privacy_gates:
 
   k_anonymity:
@@ -141,6 +177,18 @@ profiles:
         Race:              passthrough
         Ethnicity:         passthrough
         ZIP:               {strategy: generalize, kind: zip3}
+        # --- direct identifiers carried on DimPatient (docs/safe_harbor_mapping.md) ---
+        AddressLine1:         suppress               # (B) street address
+        City:                 suppress               # (B) geography finer than state
+        StateAbbr:            passthrough            # (B) STATE is expressly permitted
+        HomePhone:            suppress               # (D) telephone number
+        MobilePhone:          suppress               # (D) telephone number
+        Email:                suppress               # (F) email address
+        SSN:                  suppress               # (G) social security number
+        DriversLicenseNumber: suppress               # (L) certificate/licence number
+        HealthPlanMemberID:   suppress               # (H) health plan beneficiary number
+        BiometricTemplateID:  suppress               # (P) biometric identifier
+        FacePhotoURI:         suppress               # (Q) full-face photograph
         PCPProviderKey:    passthrough                # surrogate FK
         EffectiveDate:     passthrough                # SCD record-mgmt date, not a care event
         ExpirationDate:    passthrough
@@ -241,6 +289,59 @@ profiles:
         RiskScore:    passthrough
         ScoreDate:    {strategy: generalize, kind: year}
 
+      # ---- DimHospitalAccount: (E) account numbers + GUARANTOR contact --------------
+      # 164.514(b)(2)(i) reaches identifiers "of relatives, employers, or household
+      # members of the individual", so the guarantor's name, phone and fax are in scope
+      # exactly as the patient's own are. This is the clause people most often miss.
+      dim_hospital_account:
+        HospitalAccountKey:     passthrough          # warehouse surrogate, not the account no.
+        PatientKey:             passthrough
+        HospitalAccountNumber:  suppress             # (E) account number
+        GuarantorAccountNumber: suppress             # (E) account number
+        GuarantorName:          suppress             # (A) name of a relative
+        GuarantorRelationship:  passthrough          # "Spouse"/"Guardian" is not identifying
+        GuarantorPhone:         suppress             # (D) telephone number
+        GuarantorFaxNumber:     suppress             # (E) fax number
+        AccountClass:           passthrough
+        AccountStatus:          passthrough
+        OpenDate:               {strategy: generalize, kind: year}
+        CloseDate:              {strategy: generalize, kind: year}
+        TotalCharges:           passthrough
+
+      # ---- FactPatientDevice: (M) device identifiers and serial numbers -------------
+      fact_patient_device:
+        PatientDeviceKey: passthrough
+        PatientKey:       passthrough
+        DeviceType:       passthrough
+        Manufacturer:     passthrough
+        ModelNumber:      passthrough                # a model is shared by many devices
+        SerialNumber:     suppress                   # (M) device serial number
+        UDI:              suppress                   # (M) the UDI embeds the serial number
+        ImplantDate:      {strategy: generalize, kind: year}
+        DeviceStatus:     passthrough
+
+      # ---- FactPortalAccess: (N) URLs and (O) IP addresses -------------------------
+      fact_portal_access:
+        PortalAccessKey: passthrough
+        PatientKey:      passthrough
+        AccessDate:      {strategy: generalize, kind: year}
+        PortalUserName:  suppress                    # (C)/(R) account handle
+        SourceIPAddress: suppress                    # (O) IP address
+        AccessedURL:     suppress                    # (N) URL, and it embeds the patient id
+        UserAgent:       passthrough                 # device class, shared by millions
+        SessionID:       suppress                    # (R) other unique identifying code
+
+      # ---- FactPatientTransport: (J) vehicle identifiers ---------------------------
+      fact_patient_transport:
+        TransportKey:                passthrough
+        PatientKey:                  passthrough
+        TransportDate:               {strategy: generalize, kind: year}
+        TransportMode:               passthrough
+        TransportAgency:             passthrough
+        VehicleIdentificationNumber: suppress        # (J) vehicle identifier / VIN
+        LicensePlateNumber:          suppress        # (J) licence plate number
+        ArrivalMinutes:              passthrough
+
       # ===================================================================================
       # EPIC CLARITY — the normalized, transactional source most Epic shops land first.
       # Same engine, same strategies; only names differ. Two things make Clarity a harder
@@ -268,10 +369,40 @@ profiles:
         STATE_C_NAME:      passthrough              # state IS permitted under Safe Harbor
         ZIP:               {strategy: generalize, kind: zip3}
         HOME_PHONE:        suppress                 # identifier #4
+        SSN:               suppress                 # identifier (G)
+        WORK_PHONE:        suppress                 # identifier (D)
+        MOBILE_PHONE:      suppress                 # identifier (D)
         EMAIL_ADDRESS:     suppress                 # identifier #6
         ADD_LINE_1:        suppress                 # street address
         AGE:               {strategy: generalize, kind: age_cap, cap: 90}   # derived in silver
         AGE_BAND:          passthrough              # already generalized in silver
+
+      # ---- COVERAGE: (H) plan beneficiary numbers; the subscriber is often a relative
+      clarity_coverage:
+        COVERAGE_ID:       passthrough
+        PAT_ID:            {strategy: tokenize, namespace: pat_id, prefix: "EP-"}
+        PAYOR_ID:          passthrough
+        PLAN_NAME:         passthrough
+        SUBSCRIBER_ID:     suppress                 # (H) health plan beneficiary number
+        GROUP_NUM:         suppress                 # (H) plan group number
+        SUBSCRIBER_NAME:   suppress                 # (A) name, frequently a relative
+        SUBSCRIBER_REL_C:  passthrough
+        MEM_EFF_FROM_DATE: {strategy: generalize, kind: year}
+        MEM_EFF_TO_DATE:   {strategy: generalize, kind: year}
+
+      # ---- HSP_ACCOUNT: (E) account numbers + guarantor contact --------------------
+      clarity_hsp_account:
+        HSP_ACCOUNT_ID:   passthrough
+        PAT_ID:           {strategy: tokenize, namespace: pat_id, prefix: "EP-"}
+        ACCT_BILLING_NUM: suppress                  # (E) account number
+        GUAR_NAME:        suppress                  # (A) name of a relative
+        GUAR_HOME_PHONE:  suppress                  # (D) telephone number
+        GUAR_FAX:         suppress                  # (E) fax number
+        ACCT_CLASS_HA_C:  passthrough
+        ACCT_STATUS:      passthrough
+        ADM_DATE_TIME:    {strategy: generalize, kind: year}
+        DISCH_DATE_TIME:  {strategy: generalize, kind: year}
+        TOT_CHGS:         passthrough
 
       # ---- PAT_ENC: one row per patient contact --------------------------------------
       clarity_pat_enc:
@@ -367,6 +498,380 @@ profiles:
         ACTIVE_STATUS: passthrough
 
   # -----------------------------------------------------------------------------------
+  # SAFE HARBOR STRICT (§164.514(b)(2)) — the profile that may ACTUALLY claim Safe Harbor.
+  #
+  # The `safe_harbor` profile above is named for its column *treatments* (year, zip3, age
+  # cap) but emits HMAC tokens derived from the MRN, so the claimable method there is
+  # expert_determination. This profile removes every derived value, which makes the Safe
+  # Harbor claim available and `assess_method_eligibility` verify it mechanically.
+  #
+  # CABOODLE ONLY — and that is a consequence, not a preference. Joining the Caboodle and
+  # Clarity stars requires a stable per-patient key, and the only shared-namespace value is
+  # the MRN. §164.514(b)(2)(i)(R) excludes "any other unique identifying number ... or code"
+  # and §164.514(c)(1) admits a re-identification code ONLY when it is "not derived from or
+  # related to information about the individual". An HMAC of the MRN is derived from it, so
+  # under Safe Harbor there is no permitted way to mint that key. Cross-source linkage is
+  # therefore unavailable here by construction. If you need it, use expert_determination.
+  #
+  # DESIGN DECISIONS A REVIEWER WILL ASK ABOUT
+  # ------------------------------------------
+  # 1. Surrogate keys are RETAINED (PatientKey, EncounterKey, ...). They are warehouse-minted
+  #    integers, not derived from or related to the individual, so they fall under the
+  #    §164.514(c) re-identification-code exception rather than identifier (R). The mapping
+  #    back to a person lives in the source warehouse and is not disclosed with the output.
+  #    Retaining them is what keeps the star schema joinable at all.
+  # 2. Names are SUPPRESSED, not synthesized. This profile cannot use `synthesize` even though
+  #    a fake name is obviously not the real one: `strat_synthesize` HMACs the source value and
+  #    indexes a name list with the digest, so the same real name always produces the same fake
+  #    one. That is a consistent, pepper-keyed pseudonym DERIVED FROM the individual's name.
+  #    The output space is only 256 combinations, so it is a poor re-identifier -- but HHS §3.2
+  #    says even patient *initials* fail Safe Harbor, so "derived but lossy" is not a category
+  #    the rule recognises. Cost: name columns arrive NULL, so anything downstream that renders
+  #    a patient label needs to handle that.
+  # 3. Provider NPI / license / DEA are SUPPRESSED even though Safe Harbor does not require it --
+  #    HHS §3.8 is explicit that provider names (and by extension provider identifiers)
+  #    need not be removed. They are suppressed here so that the profile contains zero
+  #    derived-value rules and the eligibility check is a mechanical yes/no rather than a
+  #    scope argument. Cost: provider-level cohorting is unavailable in this profile.
+  # 4. Free text is SUPPRESSED, not redacted. HHS §3.10 requires identifiers to be removed
+  #    "regardless of location", and guaranteeing that in narrative requires validated NER
+  #    with a measured recall floor. This profile chooses removal over detection. The
+  #    expert_determination profile keeps the column and redacts it.
+  # 5. Patient SCD dates (EffectiveDate/ExpirationDate on dim_patient) are generalized to
+  #    year. They record when a patient row changed, which is a date related to the
+  #    individual. Provider/facility SCD dates are not, and pass through.
+  #
+  # ZIP3 handling (restricted low-population prefixes -> "000") and the 90+ age cap are
+  # implemented by the engine's `zip3` / `age_cap` / `birth_year` generalizers, not here.
+  # -----------------------------------------------------------------------------------
+  safe_harbor_strict:
+    default_strategy: suppress
+
+    tables:
+
+      # ---- DimPatient -------------------------------------------------------------
+      dim_patient:
+        PatientKey:        passthrough                # warehouse surrogate, §164.514(c)
+        PatientDurableKey: passthrough
+        MRN:               {strategy: surrogate}      # 164.514(c) ASSIGNED code, not derived
+        FirstName:         suppress                   # identifier (A) — see design decision 2
+        LastName:          suppress
+        PatientName:       suppress
+        DateOfBirth:       {strategy: generalize, kind: birth_year, cap_age: 90}
+        Age:               {strategy: generalize, kind: age_cap, cap: 90}
+        AgeBand:           passthrough
+        Gender:            passthrough
+        Race:              passthrough
+        Ethnicity:         passthrough
+        ZIP:               {strategy: generalize, kind: zip3}
+        # --- direct identifiers carried on DimPatient (docs/safe_harbor_mapping.md) ---
+        AddressLine1:         suppress               # (B) street address
+        City:                 suppress               # (B) geography finer than state
+        StateAbbr:            passthrough            # (B) STATE is expressly permitted
+        HomePhone:            suppress               # (D) telephone number
+        MobilePhone:          suppress               # (D) telephone number
+        Email:                suppress               # (F) email address
+        SSN:                  suppress               # (G) social security number
+        DriversLicenseNumber: suppress               # (L) certificate/licence number
+        HealthPlanMemberID:   suppress               # (H) health plan beneficiary number
+        BiometricTemplateID:  suppress               # (P) biometric identifier
+        FacePhotoURI:         suppress               # (Q) full-face photograph
+        PCPProviderKey:    passthrough                # surrogate FK
+        EffectiveDate:     {strategy: generalize, kind: year}
+        ExpirationDate:    {strategy: generalize, kind: year}
+
+      # ---- DimProvider ------------------------------------------------------------
+      dim_provider:
+        ProviderKey:        passthrough
+        ProviderDurableKey: passthrough
+        NPI:                suppress                  # see design decision 3
+        ProviderName:       suppress                  # see design decision 2
+        FirstName:          suppress
+        LastName:           suppress
+        ProviderFullName:   suppress
+        Credentials:        passthrough
+        Gender:             passthrough
+        ProviderType:       passthrough
+        IsProviderActive:   passthrough
+        PrimarySpecialty:   passthrough
+        ProviderStatus:     passthrough
+        HireDate:           passthrough               # provider employment, not patient PHI
+        TerminationDate:    passthrough
+        IsActive:           passthrough
+        EffectiveDate:      passthrough
+        ExpirationDate:     passthrough
+
+      # ---- DimProviderCredential --------------------------------------------------
+      dim_provider_credential:
+        ProviderCredentialKey:   passthrough
+        ProviderKey:             passthrough
+        ProviderDurableKey:      passthrough
+        LicenseNumber:           suppress             # see design decision 3
+        LicenseState:            passthrough
+        DEANumber:               suppress             # see design decision 3
+        BoardCertification:      passthrough
+        LicenseExpirationDate:   passthrough
+        DEAExpirationDate:       passthrough
+        BoardCertExpirationDate: passthrough
+        EffectiveDate:           passthrough
+        ExpirationDate:          passthrough
+
+      # ---- DimFacility ------------------------------------------------------------
+      dim_facility:
+        FacilityKey:        passthrough
+        FacilityDurableKey: passthrough
+        FacilityID:         passthrough
+        FacilityName:       passthrough
+        AddressLine1:       suppress                  # street address = identifier (B)
+        City:               passthrough
+        StateAbbr:          passthrough
+        ZIP:                passthrough               # facility (org) geography, not patient
+        Region:             passthrough
+        EffectiveDate:      passthrough
+        ExpirationDate:     passthrough
+
+      # ---- Facts: keys + measures kept; every care date collapsed to year ----------
+      fact_claim:
+        ClaimKey:               passthrough
+        PatientKey:             passthrough
+        BillingProviderKey:     passthrough
+        RenderingProviderKey:   passthrough
+        PayerKey:               passthrough
+        ProcedureKey:           passthrough
+        DiagnosisKey:           passthrough
+        ServiceDate:            {strategy: generalize, kind: year}
+        BilledAmount:           passthrough
+        AllowedAmount:          passthrough
+        PaidAmount:             passthrough
+        ClaimStatus:            passthrough
+        DeniedFlag:             passthrough
+        AllowedVariance:        passthrough
+        PatientResponsibility:  passthrough
+        ServiceYear:            passthrough
+        ServiceMonth:           suppress              # yyyy-MM is finer than year
+
+      fact_encounter:
+        EncounterKey:          passthrough
+        PatientKey:            passthrough
+        AttendingProviderKey:  passthrough
+        ReferringProviderKey:  passthrough
+        DepartmentKey:         passthrough
+        LocationKey:           passthrough
+        DiagnosisKey:          passthrough
+        EncounterDate:         {strategy: generalize, kind: year}
+        EncounterType:         passthrough
+        LengthOfStay:          passthrough
+        EncounterYear:         passthrough
+        EncounterMonth:        suppress
+        ReasonForVisitNote:    suppress               # see design decision 4
+
+      fact_risk_score:
+        RiskScoreKey: passthrough
+        PatientKey:   passthrough
+        ProviderKey:  passthrough
+        RiskModel:    passthrough
+        RiskScore:    passthrough
+        ScoreDate:    {strategy: generalize, kind: year}
+
+      # ---- DimHospitalAccount: (E) account numbers + GUARANTOR contact --------------
+      # 164.514(b)(2)(i) reaches identifiers "of relatives, employers, or household
+      # members of the individual", so the guarantor's name, phone and fax are in scope
+      # exactly as the patient's own are. This is the clause people most often miss.
+      dim_hospital_account:
+        HospitalAccountKey:     passthrough          # warehouse surrogate, not the account no.
+        PatientKey:             passthrough
+        HospitalAccountNumber:  suppress             # (E) account number
+        GuarantorAccountNumber: suppress             # (E) account number
+        GuarantorName:          suppress             # (A) name of a relative
+        GuarantorRelationship:  passthrough          # "Spouse"/"Guardian" is not identifying
+        GuarantorPhone:         suppress             # (D) telephone number
+        GuarantorFaxNumber:     suppress             # (E) fax number
+        AccountClass:           passthrough
+        AccountStatus:          passthrough
+        OpenDate:               {strategy: generalize, kind: year}
+        CloseDate:              {strategy: generalize, kind: year}
+        TotalCharges:           passthrough
+
+      # ---- FactPatientDevice: (M) device identifiers and serial numbers -------------
+      fact_patient_device:
+        PatientDeviceKey: passthrough
+        PatientKey:       passthrough
+        DeviceType:       passthrough
+        Manufacturer:     passthrough
+        ModelNumber:      passthrough                # a model is shared by many devices
+        SerialNumber:     suppress                   # (M) device serial number
+        UDI:              suppress                   # (M) the UDI embeds the serial number
+        ImplantDate:      {strategy: generalize, kind: year}
+        DeviceStatus:     passthrough
+
+      # ---- FactPortalAccess: (N) URLs and (O) IP addresses -------------------------
+      fact_portal_access:
+        PortalAccessKey: passthrough
+        PatientKey:      passthrough
+        AccessDate:      {strategy: generalize, kind: year}
+        PortalUserName:  suppress                    # (C)/(R) account handle
+        SourceIPAddress: suppress                    # (O) IP address
+        AccessedURL:     suppress                    # (N) URL, and it embeds the patient id
+        UserAgent:       passthrough                 # device class, shared by millions
+        SessionID:       suppress                    # (R) other unique identifying code
+
+      # ---- FactPatientTransport: (J) vehicle identifiers ---------------------------
+      fact_patient_transport:
+        TransportKey:                passthrough
+        PatientKey:                  passthrough
+        TransportDate:               {strategy: generalize, kind: year}
+        TransportMode:               passthrough
+        TransportAgency:             passthrough
+        VehicleIdentificationNumber: suppress        # (J) vehicle identifier / VIN
+        LicensePlateNumber:          suppress        # (J) licence plate number
+        ArrivalMinutes:              passthrough
+
+
+      # ===================================================================================
+      # EPIC CLARITY under strict Safe Harbor.
+      #
+      # Derived mechanically from the safe_harbor Clarity rules by one substitution, so no
+      # column can be forgotten: every `tokenize` on a RECORD-LINKAGE key becomes
+      # `surrogate` -- a code drawn from a CSPRNG and assigned, per 164.514(c)(1), rather
+      # than HMAC-ed from the patient. Every other `tokenize`, and every `synthesize` /
+      # `redact_text`, becomes `suppress`, because those emit values DERIVED FROM the
+      # individual and would forfeit the Safe Harbor claim.
+      #
+      # This is what buys multi-source Safe Harbor: Caboodle MRN and Clarity PAT_MRN_ID land
+      # on the SAME assigned code, so the two schemas conform without either one ever being
+      # the source of the key. The price is custody -- the mapping is real, it lives in the
+      # Vault, and losing it severs the link permanently. See src/fabric_phi_deid/crosswalk.py.
+      # ===================================================================================
+      clarity_patient:
+        PAT_ID:           {strategy: surrogate}
+        PAT_MRN_ID:       {strategy: surrogate}
+        PAT_NAME:         suppress
+        PAT_FIRST_NAME:   suppress
+        PAT_LAST_NAME:    suppress
+        BIRTH_DATE:       {strategy: generalize, kind: birth_year, cap_age: 90}
+        SEX_C:            passthrough
+        MARITAL_STATUS_C: passthrough
+        PAT_STATUS_C:     passthrough
+        DEATH_DATE:       {strategy: generalize, kind: year}
+        CITY:             suppress
+        STATE_C_NAME:     passthrough
+        ZIP:              {strategy: generalize, kind: zip3}
+        HOME_PHONE:       suppress
+        SSN:              suppress
+        WORK_PHONE:       suppress
+        MOBILE_PHONE:     suppress
+        EMAIL_ADDRESS:    suppress
+        ADD_LINE_1:       suppress
+        AGE:              {strategy: generalize, kind: age_cap, cap: 90}
+        AGE_BAND:         passthrough
+
+      clarity_coverage:
+        COVERAGE_ID:       passthrough
+        PAT_ID:            {strategy: surrogate}
+        PAYOR_ID:          passthrough
+        PLAN_NAME:         passthrough
+        SUBSCRIBER_ID:     suppress
+        GROUP_NUM:         suppress
+        SUBSCRIBER_NAME:   suppress
+        SUBSCRIBER_REL_C:  passthrough
+        MEM_EFF_FROM_DATE: {strategy: generalize, kind: year}
+        MEM_EFF_TO_DATE:   {strategy: generalize, kind: year}
+
+      clarity_hsp_account:
+        HSP_ACCOUNT_ID:   passthrough
+        PAT_ID:           {strategy: surrogate}
+        ACCT_BILLING_NUM: suppress
+        GUAR_NAME:        suppress
+        GUAR_HOME_PHONE:  suppress
+        GUAR_FAX:         suppress
+        ACCT_CLASS_HA_C:  passthrough
+        ACCT_STATUS:      passthrough
+        ADM_DATE_TIME:    {strategy: generalize, kind: year}
+        DISCH_DATE_TIME:  {strategy: generalize, kind: year}
+        TOT_CHGS:         passthrough
+
+      clarity_pat_enc:
+        PAT_ENC_CSN_ID: {strategy: surrogate}
+        PAT_ID:         {strategy: surrogate}
+        PAT_ENC_DATE:   {strategy: generalize, kind: year}
+        CONTACT_DATE:   {strategy: generalize, kind: year}
+        ENC_TYPE_C:     passthrough
+        APPT_STATUS_C:  passthrough
+        DEPARTMENT_ID:  passthrough
+        VISIT_PROV_ID:  passthrough
+        ENC_CLOSED_YN:  passthrough
+        ENC_YEAR:       passthrough
+        ENC_MONTH:      suppress
+
+      clarity_pat_enc_hsp:
+        PAT_ENC_CSN_ID:    {strategy: surrogate}
+        PAT_ID:            {strategy: surrogate}
+        ADT_PAT_CLASS:     passthrough
+        HOSP_ADMSN_TIME:   {strategy: generalize, kind: year}
+        HOSP_DISCH_TIME:   {strategy: generalize, kind: year}
+        ADMIT_SOURCE_C:    passthrough
+        DISCH_DISP_C:      passthrough
+        DEPARTMENT_ID:     passthrough
+        ADMISSION_PROV_ID: passthrough
+        LOS_DAYS:          passthrough
+
+      clarity_pat_enc_dx:
+        PAT_ENC_CSN_ID: {strategy: surrogate}
+        PAT_ID:         {strategy: surrogate}
+        LINE:           passthrough
+        CONTACT_DATE:   {strategy: generalize, kind: year}
+        DX_ID:          passthrough
+        PRIMARY_DX_YN:  passthrough
+        DX_ED_YN_C:     passthrough
+
+      clarity_order_med:
+        ORDER_MED_ID:      {strategy: surrogate}
+        PAT_ID:            {strategy: surrogate}
+        PAT_ENC_CSN_ID:    {strategy: surrogate}
+        MEDICATION_ID:     passthrough
+        AUTHRZING_PROV_ID: passthrough
+        ORDERING_DATE:     {strategy: generalize, kind: year}
+        START_DATE:        {strategy: generalize, kind: year}
+        END_DATE:          {strategy: generalize, kind: year}
+        ORDER_STATUS_C:    passthrough
+        QUANTITY:          passthrough
+        HV_DISCRETE_DOSE:  passthrough
+
+      clarity_order_proc:
+        ORDER_PROC_ID:     {strategy: surrogate}
+        PAT_ID:            {strategy: surrogate}
+        PAT_ENC_CSN_ID:    {strategy: surrogate}
+        PROC_ID:           passthrough
+        AUTHRZING_PROV_ID: passthrough
+        ORDERING_DATE:     {strategy: generalize, kind: year}
+        PROC_START_TIME:   {strategy: generalize, kind: year}
+        ORDER_STATUS_C:    passthrough
+        QUANTITY:          passthrough
+        ORDER_TYPE:        passthrough
+
+      clarity_order_results:
+        ORDER_PROC_ID:  {strategy: surrogate}
+        LINE:           passthrough
+        PAT_ID:         {strategy: surrogate}
+        PAT_ENC_CSN_ID: {strategy: surrogate}
+        COMPONENT_ID:   passthrough
+        RESULT_DATE:    {strategy: generalize, kind: year}
+        ORD_VALUE:      passthrough
+        ORD_NUM_VALUE:  passthrough
+        REFERENCE_UNIT: passthrough
+        REFERENCE_LOW:  passthrough
+        REFERENCE_HIGH: passthrough
+        RESULT_FLAG_C:  passthrough
+
+      clarity_ser:
+        PROV_ID:       passthrough
+        PROV_NAME:     suppress
+        PROV_TYPE_C:   passthrough
+        SPECIALTY:     passthrough
+        NPI:           suppress
+        ACTIVE_STATUS: passthrough
+
+  # -----------------------------------------------------------------------------------
   # EXPERT DETERMINATION (§164.514(b)(1)): retain analytic utility. Care dates are
   # SHIFTED per-patient (intervals preserved) instead of collapsed to year. Requires a
   # statistician's determination of low re-identification risk.
@@ -389,6 +894,18 @@ profiles:
         Race:              passthrough
         Ethnicity:         passthrough
         ZIP:               {strategy: generalize, kind: zip3}
+        # --- direct identifiers carried on DimPatient (docs/safe_harbor_mapping.md) ---
+        AddressLine1:         suppress               # (B) street address
+        City:                 suppress               # (B) geography finer than state
+        StateAbbr:            passthrough            # (B) STATE is expressly permitted
+        HomePhone:            suppress               # (D) telephone number
+        MobilePhone:          suppress               # (D) telephone number
+        Email:                suppress               # (F) email address
+        SSN:                  suppress               # (G) social security number
+        DriversLicenseNumber: suppress               # (L) certificate/licence number
+        HealthPlanMemberID:   suppress               # (H) health plan beneficiary number
+        BiometricTemplateID:  suppress               # (P) biometric identifier
+        FacePhotoURI:         suppress               # (Q) full-face photograph
         PCPProviderKey:    passthrough
         EffectiveDate:     passthrough
         ExpirationDate:    passthrough
@@ -484,6 +1001,59 @@ profiles:
         RiskScore:    passthrough
         ScoreDate:    {strategy: date_shift, entity_column: PatientKey, max_days: 365}
 
+      # ---- DimHospitalAccount: (E) account numbers + GUARANTOR contact --------------
+      # 164.514(b)(2)(i) reaches identifiers "of relatives, employers, or household
+      # members of the individual", so the guarantor's name, phone and fax are in scope
+      # exactly as the patient's own are. This is the clause people most often miss.
+      dim_hospital_account:
+        HospitalAccountKey:     passthrough          # warehouse surrogate, not the account no.
+        PatientKey:             passthrough
+        HospitalAccountNumber:  suppress             # (E) account number
+        GuarantorAccountNumber: suppress             # (E) account number
+        GuarantorName:          suppress             # (A) name of a relative
+        GuarantorRelationship:  passthrough          # "Spouse"/"Guardian" is not identifying
+        GuarantorPhone:         suppress             # (D) telephone number
+        GuarantorFaxNumber:     suppress             # (E) fax number
+        AccountClass:           passthrough
+        AccountStatus:          passthrough
+        OpenDate:               {strategy: date_shift, entity_column: PatientKey, max_days: 365}
+        CloseDate:              {strategy: date_shift, entity_column: PatientKey, max_days: 365}
+        TotalCharges:           passthrough
+
+      # ---- FactPatientDevice: (M) device identifiers and serial numbers -------------
+      fact_patient_device:
+        PatientDeviceKey: passthrough
+        PatientKey:       passthrough
+        DeviceType:       passthrough
+        Manufacturer:     passthrough
+        ModelNumber:      passthrough                # a model is shared by many devices
+        SerialNumber:     suppress                   # (M) device serial number
+        UDI:              suppress                   # (M) the UDI embeds the serial number
+        ImplantDate:      {strategy: date_shift, entity_column: PatientKey, max_days: 365}
+        DeviceStatus:     passthrough
+
+      # ---- FactPortalAccess: (N) URLs and (O) IP addresses -------------------------
+      fact_portal_access:
+        PortalAccessKey: passthrough
+        PatientKey:      passthrough
+        AccessDate:      {strategy: date_shift, entity_column: PatientKey, max_days: 365}
+        PortalUserName:  suppress                    # (C)/(R) account handle
+        SourceIPAddress: suppress                    # (O) IP address
+        AccessedURL:     suppress                    # (N) URL, and it embeds the patient id
+        UserAgent:       passthrough                 # device class, shared by millions
+        SessionID:       suppress                    # (R) other unique identifying code
+
+      # ---- FactPatientTransport: (J) vehicle identifiers ---------------------------
+      fact_patient_transport:
+        TransportKey:                passthrough
+        PatientKey:                  passthrough
+        TransportDate:               {strategy: date_shift, entity_column: PatientKey, max_days: 365}
+        TransportMode:               passthrough
+        TransportAgency:             passthrough
+        VehicleIdentificationNumber: suppress        # (J) vehicle identifier / VIN
+        LicensePlateNumber:          suppress        # (J) licence plate number
+        ArrivalMinutes:              passthrough
+
       # ===================================================================================
       # EPIC CLARITY under Expert Determination. Identical column classification to Safe
       # Harbor; the ONLY difference is that care dates are SHIFTED per patient instead of
@@ -507,10 +1077,40 @@ profiles:
         STATE_C_NAME:      passthrough
         ZIP:               {strategy: generalize, kind: zip3}
         HOME_PHONE:        suppress
+        SSN:               suppress
+        WORK_PHONE:        suppress
+        MOBILE_PHONE:      suppress
         EMAIL_ADDRESS:     suppress
         ADD_LINE_1:        suppress
         AGE:               {strategy: generalize, kind: age_cap, cap: 90}
         AGE_BAND:          passthrough
+
+      # ---- COVERAGE: (H) plan beneficiary numbers; the subscriber is often a relative
+      clarity_coverage:
+        COVERAGE_ID:       passthrough
+        PAT_ID:            {strategy: tokenize, namespace: pat_id, prefix: "EP-"}
+        PAYOR_ID:          passthrough
+        PLAN_NAME:         passthrough
+        SUBSCRIBER_ID:     suppress                 # (H) health plan beneficiary number
+        GROUP_NUM:         suppress                 # (H) plan group number
+        SUBSCRIBER_NAME:   suppress                 # (A) name, frequently a relative
+        SUBSCRIBER_REL_C:  passthrough
+        MEM_EFF_FROM_DATE: {strategy: date_shift, entity_column: PAT_ID, max_days: 365}
+        MEM_EFF_TO_DATE:   {strategy: date_shift, entity_column: PAT_ID, max_days: 365}
+
+      # ---- HSP_ACCOUNT: (E) account numbers + guarantor contact --------------------
+      clarity_hsp_account:
+        HSP_ACCOUNT_ID:   passthrough
+        PAT_ID:           {strategy: tokenize, namespace: pat_id, prefix: "EP-"}
+        ACCT_BILLING_NUM: suppress                  # (E) account number
+        GUAR_NAME:        suppress                  # (A) name of a relative
+        GUAR_HOME_PHONE:  suppress                  # (D) telephone number
+        GUAR_FAX:         suppress                  # (E) fax number
+        ACCT_CLASS_HA_C:  passthrough
+        ACCT_STATUS:      passthrough
+        ADM_DATE_TIME:    {strategy: date_shift, entity_column: PAT_ID, max_days: 365}
+        DISCH_DATE_TIME:  {strategy: date_shift, entity_column: PAT_ID, max_days: 365}
+        TOT_CHGS:         passthrough
 
       clarity_pat_enc:
         PAT_ENC_CSN_ID:  {strategy: tokenize, namespace: csn, prefix: "ENC-"}

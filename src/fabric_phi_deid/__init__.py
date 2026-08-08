@@ -36,6 +36,16 @@ from .config import (
     audit_coverage,
     validate_config,
 )
+from .crosswalk import (
+    CROSSWALK_SOURCE_COLUMN,
+    CROSSWALK_TABLE,
+    SURROGATE_COLUMN,
+    SURROGATE_PREFIX,
+    crosswalk_from_rows,
+    crosswalk_to_rows,
+    mint_crosswalk,
+    mint_surrogate_id,
+)
 from .deid_engine import (
     STRATEGIES,
     apply_strategy,
@@ -106,6 +116,14 @@ __all__ = [
     "resolve_table_plan",
     "deidentify_table",
     "STRATEGIES",
+    "CROSSWALK_SOURCE_COLUMN",
+    "CROSSWALK_TABLE",
+    "SURROGATE_COLUMN",
+    "SURROGATE_PREFIX",
+    "crosswalk_from_rows",
+    "crosswalk_to_rows",
+    "mint_crosswalk",
+    "mint_surrogate_id",
     # config integrity
     "validate_config",
     "audit_coverage",

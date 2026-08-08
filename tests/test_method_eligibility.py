@@ -99,7 +99,7 @@ def test_a_removal_only_profile_may_claim_safe_harbor():
                 "tables": {
                     "dim_patient": {
                         "MRN": "suppress",
-                        "PatientName": {"strategy": "synthesize", "kind": "name"},
+                        "PatientName": "suppress",
                         "DateOfBirth": {"strategy": "generalize", "kind": "birth_year"},
                     }
                 }
@@ -110,6 +110,51 @@ def test_a_removal_only_profile_may_claim_safe_harbor():
     assert verdict.passes
     assert verdict.safe_harbor_available
     assert verdict.claimable_method == SAFE_HARBOR
+
+
+def test_synthesize_blocks_a_safe_harbor_claim():
+    """A fake name is still derived when the generator is seeded with the real one.
+
+    ``strat_synthesize`` HMACs the source value and indexes a name list with the digest, so
+    the same real name always yields the same fake one -- a consistent, pepper-keyed pseudonym.
+    Small output space or not, HHS §3.2 rules out even patient initials, so a derived remnant
+    of a name does not survive a Safe Harbor claim.
+    """
+    cfg = {
+        "active_profile": "p",
+        "profiles": {"p": {"tables": {"dim_patient": {"PatientName": {"strategy": "synthesize"}}}}},
+    }
+    verdict = assess_method_eligibility(cfg, claimed_method=SAFE_HARBOR)
+    assert not verdict.passes
+    assert verdict.derived_rules[0].strategy == "synthesize"
+
+
+def test_redact_text_is_judged_on_its_replacement_parameter():
+    """The strategy name alone cannot answer this one, so the checker must read the params.
+
+    ``replacement: label`` swaps each detected span for its entity type and is a removal.
+    ``replacement: token`` swaps it for a value derived from the span, which is a pseudonym
+    living inside free text -- the easiest place for one to hide from a column-level review.
+    """
+
+    def _cfg(replacement):
+        return {
+            "active_profile": "p",
+            "profiles": {
+                "p": {
+                    "tables": {
+                        "fact_encounter": {
+                            "Note": {"strategy": "redact_text", "replacement": replacement}
+                        }
+                    }
+                }
+            },
+        }
+
+    assert assess_method_eligibility(_cfg("label"), claimed_method=SAFE_HARBOR).passes
+    verdict = assess_method_eligibility(_cfg("token"), claimed_method=SAFE_HARBOR)
+    assert not verdict.passes
+    assert verdict.derived_rules[0].strategy == "redact_text(replacement=token)"
 
 
 def test_claiming_the_weaker_method_is_always_allowed():
@@ -127,6 +172,113 @@ def test_shorthand_string_rules_are_inspected():
 def test_profile_defaults_to_active_profile(shipped_config):
     verdict = assess_method_eligibility(shipped_config, claimed_method=SAFE_HARBOR)
     assert verdict.profile == shipped_config["active_profile"]
+
+
+# --------------------------------------------------------------------------------------
+# The shipped safe_harbor_strict profile — the one that may actually make the claim
+#
+# These are the tests that turn the profile's promise into something mechanical. The
+# comment block in deid_rules.yaml explains *why* each rule is what it is; these assert
+# that it still is. Anyone who later adds a tokenize rule "just to keep the join" fails
+# here rather than in front of a compliance reviewer.
+# --------------------------------------------------------------------------------------
+SAFE_HARBOR_STRICT = "safe_harbor_strict"
+
+
+def test_safe_harbor_strict_may_claim_safe_harbor(shipped_config):
+    verdict = assess_method_eligibility(
+        shipped_config, claimed_method=SAFE_HARBOR, profile=SAFE_HARBOR_STRICT
+    )
+    assert verdict.passes, verdict.summary()
+    assert verdict.safe_harbor_available
+    assert verdict.claimable_method == SAFE_HARBOR
+    assert verdict.derived_rules == ()
+
+
+def test_safe_harbor_strict_covers_both_source_systems(shipped_config):
+    """Multi-source Safe Harbor is the whole point, and it is easy to lose by accident.
+
+    Cross-source linkage cannot use a key *derived* from the MRN. For a long time that was
+    read as "so Safe Harbor is Caboodle-only" -- which is wrong: §164.514(c) permits an
+    *assigned* code. If a Clarity table disappears from this profile, someone has quietly
+    given up on conforming the second source rather than fixing the key.
+    """
+    tables = shipped_config["profiles"][SAFE_HARBOR_STRICT]["tables"]
+    assert [t for t in tables if t.startswith("clarity_")]
+    assert "clarity_patient" in tables
+
+
+def test_safe_harbor_strict_denies_by_default(shipped_config):
+    """An unlisted column must be dropped, not passed through."""
+    assert shipped_config["profiles"][SAFE_HARBOR_STRICT]["default_strategy"] == "suppress"
+
+
+def test_safe_harbor_strict_assigns_the_mrn_code_rather_than_deriving_it(shipped_config):
+    """§164.514(c)(1) admits a code only when it is not derived from the individual.
+
+    ``surrogate`` draws from a CSPRNG, so the code carries no information about the patient
+    and the mapping exists only in the Vault. ``tokenize`` would also join, and would also
+    look like an opaque string -- and would forfeit the claim, because it is reproducible
+    from the MRN. The two are one word apart in YAML, which is exactly why this is a test.
+    """
+    tables = shipped_config["profiles"][SAFE_HARBOR_STRICT]["tables"]
+    assert tables["dim_patient"]["MRN"] == {"strategy": "surrogate"}
+    assert tables["clarity_patient"]["PAT_MRN_ID"] == {"strategy": "surrogate"}
+
+
+def test_safe_harbor_strict_caps_age_and_truncates_zip(shipped_config):
+    """The two generalizations Safe Harbor names explicitly: 90+ aggregation and ZIP3."""
+    patient = shipped_config["profiles"][SAFE_HARBOR_STRICT]["tables"]["dim_patient"]
+    assert patient["Age"] == {"strategy": "generalize", "kind": "age_cap", "cap": 90}
+    assert patient["ZIP"] == {"strategy": "generalize", "kind": "zip3"}
+    assert patient["DateOfBirth"] == {
+        "strategy": "generalize",
+        "kind": "birth_year",
+        "cap_age": 90,
+    }
+
+
+def test_safe_harbor_strict_keeps_no_free_text(shipped_config):
+    """§3.10: identifiers must go regardless of location. This profile removes rather than
+    detects, so no narrative column may survive under any strategy."""
+    tables = shipped_config["profiles"][SAFE_HARBOR_STRICT]["tables"]
+    assert tables["fact_encounter"]["ReasonForVisitNote"] == "suppress"
+    strategies = {
+        rule if isinstance(rule, str) else rule["strategy"]
+        for columns in tables.values()
+        for rule in columns.values()
+    }
+    assert "redact_text" not in strategies
+
+
+def test_safe_harbor_strict_suppresses_names_rather_than_synthesizing_them(shipped_config):
+    """Synthesized names are HMAC-seeded by the real name, so they are derived values.
+
+    This is the rule that is easiest to relax by accident -- a NULL name column looks like a
+    bug and `synthesize` looks like the obvious fix. It is not one, for this profile.
+    """
+    tables = shipped_config["profiles"][SAFE_HARBOR_STRICT]["tables"]
+    strategies = {
+        rule if isinstance(rule, str) else rule["strategy"]
+        for columns in tables.values()
+        for rule in columns.values()
+    }
+    assert "synthesize" not in strategies
+    assert tables["dim_patient"]["PatientName"] == "suppress"
+
+
+def test_the_misnamed_safe_harbor_profile_still_cannot_claim_it(shipped_config):
+    """Guards the distinction the new profile exists to make.
+
+    `safe_harbor` is named for its column treatments and emits MRN-derived tokens, so the
+    claimable method there is Expert Determination. If this ever starts passing, the two
+    profiles have collapsed into one and the naming is no longer merely misleading.
+    """
+    verdict = assess_method_eligibility(
+        shipped_config, claimed_method=SAFE_HARBOR, profile="safe_harbor"
+    )
+    assert not verdict.passes
+    assert verdict.claimable_method == EXPERT_DETERMINATION
 
 
 def test_unknown_profile_yields_no_rules_rather_than_raising():

@@ -98,23 +98,45 @@ the repo's `src/` and `config/` folders into **each** workspace's Lakehouse at
 `02b_silver_deid` is the **single privileged crossing point** — it runs in Raw, reads raw PHI,
 and writes the de-identified copy that Analytics reads cross-workspace.
 
-**Pick your HIPAA method (optional).** The accelerator ships both §164.514(b) methods as
-profiles in [`config/deid_rules.yaml`](config/deid_rules.yaml): **Safe Harbor** (dates → year,
-ZIP → 3-digit, age 90+ capped and birth years floored to match) and **Expert Determination**
-(per-patient date shift that preserves intervals). It uses `active_profile` from that file by
-default. To switch at run time without editing the YAML, set `PROFILE_OVERRIDE = "safe_harbor"`
-or `"expert_determination"` in the selector cell near the top of `02b_silver_deid`.
+**Pick your HIPAA method (optional).** The accelerator ships three profiles in
+[`config/deid_rules.yaml`](config/deid_rules.yaml). It uses `active_profile` from that file by
+default; to switch at run time without editing the YAML, set `PROFILE_OVERRIDE` in the selector
+cell near the top of `02b_silver_deid`.
+
+| Profile | Claimable method | Sources | Buys you | Costs you |
+|---|---|---|---|---|
+| `safe_harbor_strict` | **Safe Harbor** §164.514(b)(2) | Caboodle + Clarity | A claim you can make without an expert, and no re-certification | Custody of a crosswalk; no free text, no provider identifiers |
+| `safe_harbor` | Expert Determination | Caboodle + Clarity | Dates → year, ZIP3, age cap, **and** the token that joins the two stars | Misleading name; needs an expert |
+| `expert_determination` | Expert Determination §164.514(b)(1) | Caboodle + Clarity | Per-patient date shift preserving intervals — real longitudinal analysis | Needs an expert; practitioners time-limit the certification |
+
+> **What `safe_harbor_strict` costs is custody, not capability.** It used to be Caboodle-only,
+> because joining the two stars needs a stable per-patient key and §164.514(c)(1) forbids one
+> *derived* from the individual. It does not forbid one **assigned**: under this profile the MRN
+> becomes a random `DEID-…` surrogate, minted once into a crosswalk held in **PHI-Vault**. Both
+> sources land on the same code, so the conformed star works and gold builds unchanged.
+> The trade is real — a token is recomputable from the pepper forever, a surrogate exists only
+> in that table. Lose it and you lose every linkage; leak it and you have leaked the way back.
+
+> **Safe Harbor is two conditions, not one.** §164.514(b)(2)(ii) also requires that you have no
+> **actual knowledge** the residual data could identify someone — something no scan can
+> establish. The `actual_knowledge:` block in the rulebook ships **unsigned**, and `NB_scorecard`
+> **fails** a Safe Harbor claim until a named individual completes and dates it. Removing
+> eighteen columns is the part that automates; knowing your own data is the part that does not.
 
 > **Note:** the `safe_harbor` profile name describes its column treatments, not the claim you
 > may make. Because it tokenizes MRNs so the two stars stay joinable, the claimable method is
 > **Expert Determination** — see [docs/safe_harbor_mapping.md](docs/safe_harbor_mapping.md).
-> `NB_scorecard` enforces this, so the claim cannot drift.
+> `NB_scorecard` enforces this, so the claim cannot drift. Use `safe_harbor_strict` when you
+> need the Safe Harbor claim itself.
 
 ### 6. Confirm the proof gate
-`NB_scorecard` asserts the in-scope Safe Harbor identifiers are absent from `gold_safe_*`,
-verifies the claimed de-identification method is one the rulebook supports, and writes a
-PHI-free evidence artifact to `Files/audit/`. Green = the Gold layer is safe for Power BI
-and Copilot.
+`NB_scorecard` asserts the in-scope Safe Harbor identifiers are absent — checking the
+`silver_deid_*` layer directly, not just `gold_safe_*`, because gold only projects the columns
+the star model asked for and would report a never-projected column as clean. It verifies the
+claimed de-identification method is one the rulebook supports, checks the actual-knowledge
+attestation when Safe Harbor is claimed, self-tests each residual-PHI detector against a
+known-positive control, and writes a PHI-free evidence artifact to `Files/audit/`.
+Green = the Gold layer is safe for Power BI and Copilot.
 
 ### 7. (Optional) Open the Power BI report
 A ready-made report + Direct Lake semantic model ship in [`reports/`](reports/). Open

@@ -53,10 +53,13 @@ from pathlib import Path
 # identifier mix. Kept as a sys.path import because scripts/ is not an installed package.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from add_clinical_notes import build_note  # noqa: E402
+from add_identifier_columns import DIM_PATIENT_NEW_COLS, dim_patient_identifiers  # noqa: E402
 
 DEFAULT_DATA_DIR = Path(__file__).resolve().parent.parent / "sample_data" / "caboodle_provider"
 
 # Column order must match the CSVs exactly — Bronze ingest reads by position/name.
+# The identifier block after ZIP is owned by add_identifier_columns.py; it is spliced in from
+# there rather than retyped so the two scripts cannot drift apart.
 PATIENT_COLS = [
     "PatientKey",
     "PatientDurableKey",
@@ -69,6 +72,7 @@ PATIENT_COLS = [
     "Race",
     "Ethnicity",
     "ZIP",
+    *DIM_PATIENT_NEW_COLS,
     "PCPProviderKey",
     "_IsCurrent",
     "EffectiveDate",
@@ -287,6 +291,7 @@ def generate(  # noqa: PLR0913 - explicit knobs are clearer than a config object
             first = rng.choice(FIRST_NAMES)
             last = rng.choice(LAST_NAMES)
             dob = _rand_date(rng, date(1930, 1, 1), date(2015, 12, 31))
+            identifiers = dim_patient_identifiers(str(pk), first, last)
             new_patient_rows.append(
                 [
                     pk,
@@ -300,6 +305,7 @@ def generate(  # noqa: PLR0913 - explicit knobs are clearer than a config object
                     rng.choice(race_pool),
                     rng.choice(ethnicity_pool),
                     rng.choice(zip_pool),
+                    *(identifiers[col] for col in DIM_PATIENT_NEW_COLS),
                     rng.choice(provider_keys),
                     1,
                     "2015-01-01",

@@ -267,7 +267,7 @@ fabric-phi-deid-accelerator/
   README.md                     ← you are here
   pyproject.toml                ← installable package (hatchling), lint/type/test/security config
   config/
-    deid_rules.yaml             ← per-column strategy config (safe_harbor + expert_determination)
+    deid_rules.yaml             ← per-column strategy config (safe_harbor_strict / safe_harbor / expert_determination)
   src/fabric_phi_deid/          ← installable Python package (pip install -e ".[dev]")
     tokenization.py             ← HMAC-SHA256 deterministic tokenizer (pure fn, Key Vault pepper)
     deid_engine.py              ← strategy dispatcher (pure core + lazy Spark wrappers)

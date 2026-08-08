@@ -43,6 +43,10 @@ STRATEGY_SPECS: dict[str, dict[str, Any]] = {
     "passthrough": {"required": [], "enums": {}},
     "suppress": {"required": [], "enums": {}},
     "tokenize": {"required": [], "enums": {}},
+    # ``crosswalk`` is deliberately NOT required here. It is a broadcast mapping supplied by
+    # the notebook at run time, not a value a YAML file could hold; the engine raises if it
+    # is missing. Requiring it in the rulebook would only invite someone to inline one.
+    "surrogate": {"required": [], "enums": {}},
     "generalize": {
         "required": ["kind"],
         "enums": {"kind": {"year", "birth_year", "zip3", "age_cap"}},

@@ -21,8 +21,54 @@ strategy the engine applies (see [`config/deid_rules.yaml`](../config/deid_rules
 > point of the accelerator — so the trade is intentional. The cost is that the claimable method
 > is Expert Determination. `determination.assess_method_eligibility()` computes this from the
 > rules themselves and `NB_scorecard` **hard-fails** a mismatched claim, so the constant cannot
-> quietly drift into a false one. Remove every `tokenize` / `date_shift` rule and a Safe Harbor
-> claim becomes available again — at the price of cross-source linkage.
+> quietly drift into a false one.
+>
+> ### If you need the claim, use `safe_harbor_strict`
+>
+> That profile is what "remove every `tokenize` / `date_shift` rule" actually looks like, paid
+> for at the stated price. It carries **zero** derived values, so `assess_method_eligibility()`
+> returns `safe_harbor` and the claim is mechanically verified rather than asserted.
+>
+> It **covers both source systems.** For a long time it did not, and the reason was read as a
+> law of nature: linking the two stars needs a stable per-patient key, the only shared value is
+> the MRN, and §164.514(c)(1) admits a re-identification code only when it is "not derived from
+> or related to information about the individual" — so an HMAC of the MRN is out. That is all
+> true, and it rules out a **derived** key. It does not rule out an **assigned** one.
+>
+> So under `safe_harbor_strict` the MRN becomes a `surrogate`: a random `DEID-…` value minted
+> once, held in a crosswalk in **PHI-Vault**, and reused for that patient everywhere. It is not
+> derived from anything about the individual, which is precisely what §164.514(c) contemplates.
+> Caboodle and Clarity land on the same code and the conformed dimension works.
+>
+> **The price is custody, and it is a real one.** A token is recomputable from the pepper
+> forever; a surrogate exists only in that crosswalk table, so losing it loses every linkage,
+> and anyone who obtains it holds the map back to identity. That is why the crosswalk lives in
+> a separate workspace with its own access control, and why Expert Determination deliberately
+> keeps `tokenize` rather than "upgrading" to surrogates. Neither is strictly better;
+> `tests/test_profile_reaches_the_data.py` pins both so the distinction cannot be tidied away.
+>
+> | | `safe_harbor_strict` | `safe_harbor` / `expert_determination` |
+> |---|---|---|
+> | MRN | `DEID-…` **assigned** code (crosswalk in Vault) | `PT-…` **derived** HMAC token |
+> | Patient / provider names | removed (NULL) | synthesized |
+> | Cross-source patient match | available | available |
+> | Recover linkage after losing the mapping | **impossible** — the map *is* the linkage | recompute from the pepper |
+> | Free-text notes | suppressed | NER-redacted |
+> | Provider NPI / license / DEA | suppressed | tokenized |
+> | Qualified expert required | **no** | yes |
+> | Re-certification | n/a | practitioners commonly time-limit |
+>
+> Names are **suppressed rather than synthesized**, which is the least obvious line in the
+> table. `strat_synthesize` HMACs the source value and indexes a name list with the digest, so
+> the same real name always yields the same fake one — a consistent, pepper-keyed pseudonym
+> derived from the individual. Only 256 combinations exist, so it re-identifies almost nobody,
+> but HHS §3.2 rules out even patient *initials*: "derived but lossy" is not a category the rule
+> recognises. `synthesize` is therefore counted as a derived value by
+> `assess_method_eligibility()`.
+>
+> Surrogate keys (`PatientKey`, `EncounterKey`) survive in both. They are warehouse-minted
+> integers, not derived from or related to the individual, so they fall under the §164.514(c)
+> code exception — which is what keeps the star schema joinable *within* Caboodle.
 
 
 The two sources are deliberately different shapes — **Caboodle** (dimensional warehouse)
@@ -34,20 +80,20 @@ names differ, which is exactly the point.
 | 1 | Names | `FirstName`, `LastName`, `PatientName`, provider names | `PAT_NAME`, `PAT_FIRST_NAME`, `PAT_LAST_NAME`, `PROV_NAME` | `synthesize` |
 | 2 | Geographic subdivisions < state | patient `ZIP` | `ZIP`, `CITY`, `ADD_LINE_1` | `generalize(zip3)` (`000` for low-pop); city/street `suppress` |
 | 3 | Dates (except year) related to an individual | `DateOfBirth`, `ServiceDate`, `EncounterDate`, `ScoreDate`, `*Month` | `BIRTH_DATE`, `DEATH_DATE`, `PAT_ENC_DATE`, `CONTACT_DATE`, `HOSP_ADMSN_TIME`, `HOSP_DISCH_TIME`, `ORDERING_DATE`, `START_DATE`, `END_DATE`, `PROC_START_TIME`, `RESULT_DATE`, `ENC_MONTH` | `generalize(year)`; **birth dates use `generalize(birth_year)`** (see row — below) / `date_shift` by `PAT_ID` (Expert Determination); month suppressed |
-| 4 | Telephone numbers | — | `HOME_PHONE` | `suppress` |
-| 5 | Fax numbers | — | — | — |
-| 6 | Email addresses | — | `EMAIL_ADDRESS` | `suppress` |
-| 7 | Social Security numbers | — | — | (scorecard scans for SSN patterns) |
-| 8 | Medical record numbers | `MRN` | `PAT_MRN_ID` | `tokenize` (HMAC, `PT-`) — **shared namespace**, so the same patient yields the same token in both schemas |
-| 9 | Health plan beneficiary numbers | (payer is org-level) | — | — |
-| 10 | Account numbers | — | — | — |
-| 11 | Certificate / license numbers | `LicenseNumber`, `DEANumber` | — | `tokenize` |
-| 12 | Vehicle identifiers | — | — | — |
-| 13 | Device identifiers / serial numbers | — | — | — |
-| 14 | Web URLs | — | — | — |
-| 15 | IP addresses | — | — | — |
-| 16 | Biometric identifiers | — | — | **`NOT_EVALUATED`** — no biometric modality in scope |
-| 17 | Full-face photos / comparable images | — | — | **`NOT_EVALUATED`** — no imaging path in the pipeline |
+| 4 | Telephone numbers | `HomePhone`, `MobilePhone`, `GuarantorPhone` | `HOME_PHONE`, `WORK_PHONE`, `MOBILE_PHONE`, `GUAR_HOME_PHONE` | `suppress` |
+| 5 | Fax numbers | `GuarantorFaxNumber` | `GUAR_FAX` | `suppress` |
+| 6 | Email addresses | `Email` | `EMAIL_ADDRESS` | `suppress` |
+| 7 | Social Security numbers | `SSN` | `SSN` | `suppress` (scorecard also scans for SSN patterns) |
+| 8 | Medical record numbers | `MRN` | `PAT_MRN_ID` | `tokenize` (HMAC, `PT-`) — **shared namespace**, so the same patient yields the same token in both schemas. Under `safe_harbor_strict`: `surrogate` (`DEID-`) |
+| 9 | Health plan beneficiary numbers | `HealthPlanMemberID` | `SUBSCRIBER_ID`, `GROUP_NUM` | `suppress` |
+| 10 | Account numbers | `HospitalAccountNumber`, `GuarantorAccountNumber` | `ACCT_BILLING_NUM` | `suppress` (the internal keys `HospitalAccountKey` / `HSP_ACCOUNT_ID` pass through — see the CSN note below) |
+| 11 | Certificate / license numbers | `DriversLicenseNumber`, `LicenseNumber`, `DEANumber` | — | `suppress` (patient), `tokenize` (provider) |
+| 12 | Vehicle identifiers | `VehicleIdentificationNumber`, `LicensePlateNumber` | — | `suppress` |
+| 13 | Device identifiers / serial numbers | `SerialNumber`, `UDI` | — | `suppress`; `ModelNumber` passes through (a model is a product, not a person) |
+| 14 | Web URLs | `AccessedURL` | — | `suppress` |
+| 15 | IP addresses | `SourceIPAddress` | — | `suppress` |
+| 16 | Biometric identifiers | `BiometricTemplateID` | — | `suppress` |
+| 17 | Full-face photos / comparable images | `FacePhotoURI` | — | `suppress` |
 | 18 | Any other unique identifying number/characteristic/code | `NPI` | `NPI`, `PAT_ID`, `PAT_ENC_CSN_ID` | `tokenize` (`NP-` / `EP-` / `ENC-`) — derived value; see the note above |
 | — | Ages > 89 must be aggregated, **and so must dates indicative of such age** | `Age`, `DateOfBirth` | `AGE`, `BIRTH_DATE` | `generalize(age_cap=90)` **and** `generalize(birth_year, cap_age=90)` |
 
@@ -84,7 +130,26 @@ names differ, which is exactly the point.
   added identifier can't leak by omission. The scorecard additionally scans for SSN/phone/
   email patterns as a backstop.
 
-The `NB_scorecard` notebook asserts these outcomes over `gold_safe_*` before publish.
+- **The guarantor is not the patient, and the rule reaches them anyway.**
+  §164.514(b)(2)(i) removes identifiers "of the individual **or of relatives, employers, or
+  household members** of the individual" — the clause most implementations miss. A guarantor
+  name, phone or account number on `dim_hospital_account` is almost always a relative, so it is
+  suppressed. `GuarantorRelationship` ("Spouse", "Parent") passes through: it describes a
+  category shared by millions, not a person.
+
+- **Removing the 18 identifiers is only half of Safe Harbor.** §164.514(b)(2) is two conditions
+  joined by AND: (i) remove the identifiers, and (ii) the covered entity has no **actual
+  knowledge** that the residual information could identify someone. No scan can establish (ii)
+  — it is a statement about what you know about your own estate. The rulebook therefore carries
+  an `actual_knowledge:` block that ships **unsigned**, and `NB_scorecard` fails any Safe Harbor
+  claim until a named individual fills it in and dates it. Deleting eighteen columns is the part
+  that automates; knowing your own data is the part that does not.
+
+The `NB_scorecard` notebook asserts these outcomes over `gold_safe_*` before publish, and
+verifies suppression directly against `silver_deid_*` — where a suppressed column still exists
+and is NULL. Scanning gold alone would be vacuous: gold only projects the columns the star
+model asked for, so a column still full of SSNs that gold never selected produces exactly the
+same clean result as one properly emptied.
 
 ## Strategy glossary: which treatment each field gets and why
 

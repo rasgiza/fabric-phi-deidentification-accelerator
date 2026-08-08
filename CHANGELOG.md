@@ -6,6 +6,148 @@ All notable changes to this project are documented here. The format is based on
 
 ## [Unreleased]
 
+### Added
+- **`safe_harbor_strict` now covers both source systems.** It shipped as Caboodle-only, and the
+  reason was written down as if it were a law of nature: cross-source linkage needs a stable
+  per-patient key, the only shared value is the MRN, and §164.514(c)(1) admits a
+  re-identification code only when it is "not derived from or related to information about the
+  individual". All true — and it rules out a **derived** key, not an **assigned** one. Under this
+  profile the MRN is now a `surrogate`: a random `DEID-…` value minted once, kept in
+  `xwalk_patient_surrogate` in **PHI-Vault**, and reused for that patient in both schemas. Ten
+  Clarity tables joined the profile, which now spans 21 tables with **zero** derived rules, so
+  `assess_method_eligibility()` still returns `safe_harbor`.
+
+  The price is custody, and it is not a footnote: an HMAC token is recomputable from the pepper
+  forever, whereas a surrogate exists **only** in that crosswalk. Lose it and every linkage is
+  gone; leak it and you have leaked the map back to identity. `expert_determination` therefore
+  keeps `tokenize` rather than "upgrading", and
+  `tests/test_profile_reaches_the_data.py::test_expert_determination_still_tokenizes_rather_than_assigning`
+  pins that so the distinction cannot be tidied away by someone unifying the two.
+
+- **Safe Harbor prong (ii) — actual knowledge — is now part of the gate.** §164.514(b)(2) is two
+  conditions joined by AND, and almost every implementation (including this one, until now)
+  ships only the first. Prong (ii) asks whether the covered entity *knows* the residual data
+  could still identify someone; no scan can answer that. New `ActualKnowledgeAttestation` type
+  and `load_actual_knowledge_attestation()`, plus an `actual_knowledge:` block in the rulebook
+  that ships **unsigned** — `NB_scorecard` fails any Safe Harbor claim until a named individual
+  completes and dates it. Placeholders, one-line statements and lapsed dates are all rejected.
+
+- **`02b_silver_deid` mints and persists the re-identification crosswalk** before any
+  de-identification runs, from the union of every column the active profile marks `surrogate` —
+  asked of the rulebook, not hard-coded. `deidentify_table()` gained a `runtime=` channel for
+  state the rulebook cannot express; the mapping is deliberately kept out of `cfg`, which is
+  fingerprinted into every shared audit manifest.
+
+- **Eleven direct identifiers on `dim_patient` and four new Caboodle tables**
+  (`dim_hospital_account`, `fact_patient_device`, `fact_portal_access`,
+  `fact_patient_transport`) plus two Clarity tables (`clarity_coverage`, `clarity_hsp_account`),
+  so identifiers 4–17 are exercised by real columns rather than being marked "not in scope".
+  `dim_hospital_account` is there specifically for the clause people most often miss:
+  §164.514(b)(2)(i) reaches identifiers of **relatives, employers and household members**, which
+  is what a guarantor usually is.
+
+- **`tests/test_profile_reaches_the_data.py`** (55 tests) and **`tests/test_notebook_twins.py`**.
+  The latter holds `03b_gold_safe.ipynb` and `03b_gold_safe_analytics.ipynb` byte-identical in
+  every code cell — see Fixed.
+
+### Fixed
+- **The residual-PHI scan could not fail.** Check 2 scanned `gold_safe_*`, where the new
+  identifier columns are never projected — so it reported clean no matter what the de-identifier
+  did. Absence of evidence, sold as evidence of absence. It now also scans `silver_deid_*`, where
+  a suppressed column still exists and is NULL, verifies every column the profile *promised* to
+  suppress, reports rules that matched nothing, and refuses to call an all-empty-tables run a
+  pass. The detector set grew to nine (adding IP, URL, driver's licence, health-plan ID, device
+  UDI, VIN) and each one is **self-tested against a known-positive control**: a regex that cannot
+  match its own control is a guaranteed PASS wearing a check's clothing.
+
+- **The MRN check hard-coded one profile's prefix.** It expected `PT-` and would have failed a
+  correct `safe_harbor_strict` run. It now reads the strategy from the rulebook and expects
+  `PT-` or `DEID-` accordingly, and records *not evaluated* rather than guessing on an
+  unrecognised strategy.
+
+- **The two gold notebooks had silently diverged.** `03b_gold_safe.ipynb` was still re-reading
+  `active_profile` and still carried the `year_of()` bug that tested a profile *name* — both
+  fixed weeks earlier in its Analytics twin. Both notebooks ran; neither raised; they just built
+  different gold depending on which file you opened. The PHI-Raw copy is regenerated from the
+  Analytics one, the difference is confined to the markdown cell, and a test now enforces that.
+
+- **Two tests encoded a limitation as a rule.**
+  `test_safe_harbor_strict_carries_no_clarity_tables` and
+  `test_safe_harbor_strict_removes_the_mrn_rather_than_coding_it` were correct for the old design
+  and wrong for the new one, failing the moment the limitation was lifted. Replaced with the
+  stronger invariants: strict must cover both sources, and both MRN columns must share one
+  *assigned* code space with no namespace — because if they drift apart the schemas stop
+  conforming quietly, with no error, and every cross-source count silently doubles.
+
+### Added (earlier in this cycle)
+- **A profile that can actually claim Safe Harbor: `safe_harbor_strict`.** Until now the repo
+  shipped a profile *named* `safe_harbor` whose claimable method was Expert Determination — it
+  tokenizes MRNs so the Caboodle and Clarity stars stay joinable, and §164.514(c)(1) admits a
+  re-identification code only when it is "not derived from or related to information about the
+  individual". That was documented honestly but left the actual method unimplemented. It now
+  exists as a **third profile**, alongside the other two rather than replacing either;
+  `active_profile` is unchanged, so no existing run behaves differently.
+
+  The new profile carries zero `tokenize`, `date_shift`, `synthesize` and `redact_text` rules, so
+  `assess_method_eligibility()` returns `safe_harbor` and the claim is machine-checked instead
+  of asserted in a comment. What it costs, stated plainly:
+
+  - ~~**Caboodle only — by construction, not by preference.**~~ **Superseded** — see the top of
+    this section. The reasoning ruled out an MRN-*derived* key and was mistakenly read as ruling
+    out cross-source linkage altogether; §164.514(c) permits an **assigned** code, which is what
+    the profile now uses.
+  - **Names arrive NULL.** `synthesize` is unavailable here — see the checker fix below — so
+    anything downstream that renders a patient or provider label must handle a null.
+  - **Free text is suppressed, not redacted.** HHS §3.10 requires identifiers to go regardless of
+    location; guaranteeing that in narrative needs validated NER with a measured recall floor.
+    This profile chooses removal over detection.
+  - **Provider NPI / license / DEA are suppressed** even though HHS §3.8 does not require it, so
+    that eligibility is a mechanical yes/no rather than a scope argument. Provider-level
+    cohorting is therefore unavailable here.
+  - **Patient SCD dates are generalized to year** — they record when a patient row changed, which
+    is a date related to the individual.
+
+  Surrogate keys (`PatientKey`, `EncounterKey`) are retained under the §164.514(c) code
+  exception: warehouse-minted integers are not derived from the individual, and they are what
+  keep the star schema joinable within Caboodle.
+
+  Locked in by seven tests in `tests/test_method_eligibility.py`, including one asserting the
+  misnamed `safe_harbor` profile still *cannot* claim Safe Harbor — so the distinction the new
+  profile exists to draw cannot quietly collapse. (The test asserting the profile contained no
+  `clarity_*` table was correct then and wrong later; it has since been replaced — see the top of
+  Unreleased.)
+
+  ~~**Known limitation:** the gold projection in `gold_conform.py` is pinned per table, not per
+  profile, and still names `MRN` …~~ **Resolved.** The pinning is still deliberate and unchanged;
+  what changed is that `MRN` under `safe_harbor_strict` now carries an assigned `DEID-` surrogate
+  instead of being removed, so `03b_gold_safe_analytics` runs under this profile with **no**
+  change to `gold_conform.py`.
+
+### Fixed
+- **`assess_method_eligibility()` had two blind spots, and both would have green-lit a false Safe
+  Harbor claim.** The check inspected only the top-level strategy *name*, which was not enough to
+  answer the question it was asked:
+  - `synthesize` was treated as a removal. It is not. `strat_synthesize` HMACs the source value
+    and indexes a name list with the digest, so the same real name always yields the same fake
+    one — a consistent, pepper-keyed pseudonym derived from the individual. The output space is
+    only 256 full-name combinations, so it re-identifies almost nobody, but HHS §3.2 rules out
+    even patient *initials*, and "derived but lossy" is not a category the rule recognises.
+  - `redact_text` was judged on its name alone, so `replacement: token` — which swaps each
+    detected span for a value derived from it — passed as a removal. The parameters are now read,
+    and only `replacement: label` counts as one. A pseudonym inside free text is the hardest kind
+    for a column-level review to catch, which is exactly why the checker has to.
+
+  Derived-rule counts consequently rise for the existing profiles (`safe_harbor` 22 → 33,
+  `expert_determination` 39 → 51). Neither could claim Safe Harbor before and neither can now,
+  so no output changes — only the accuracy of the reason given.
+
+### Changed
+- `NB_scorecard` no longer hardcodes `DETERMINATION_METHOD = EXPERT_DETERMINATION`. The claim is
+  now asserted per profile in `METHOD_CLAIM_BY_PROFILE`, which keeps it a human assertion that
+  check 1 has standing to refute — a value derived from the rules could only ever agree with
+  itself. An unrecorded profile raises rather than defaulting, so adding a profile forces someone
+  to state which method it may claim.
+
 ## [0.2.0] - 2026-08-05
 
 A compliance-correctness release. Several controls that were **advisory** are now **gating**, and

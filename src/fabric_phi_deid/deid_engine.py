@@ -14,6 +14,10 @@ Strategies (mirrors the Tonic Textual "generator" model, extended for structured
 Harbor de-identification):
 
 - ``tokenize``     : deterministic keyed HMAC token (reversible only via the vault crosswalk)
+- ``surrogate``    : randomly *assigned* code looked up in a pre-minted crosswalk. Same job as
+  ``tokenize`` -- a stable per-patient key that conforms two source systems -- but drawn from a
+  CSPRNG instead of derived from the identifier, which is what §164.514(c) requires and what
+  lets a Safe Harbor profile link across systems at all. See :mod:`fabric_phi_deid.crosswalk`.
 - ``synthesize``   : consistent fake-but-realistic value (irreversible, shareable)
 - ``generalize``   : reduce precision — date->year, birth date->floored year, zip->3-digit,
   age cap 90+
@@ -110,6 +114,40 @@ def strat_tokenize(value: Any, params: dict, pepper: str) -> Any:
         prefix=params.get("prefix", ""),
         strip_separators=strip_separators,
     )
+
+
+def strat_surrogate(value: Any, params: dict, pepper: str) -> Any:
+    """Replace the identifier with its randomly assigned code from a pre-minted crosswalk.
+
+    ``params["crosswalk"]`` is a ``{identifier: code}`` mapping supplied by the *caller* --
+    minted once on the driver by :func:`fabric_phi_deid.crosswalk.mint_crosswalk` and
+    broadcast -- not something the rulebook can express. The rulebook says *that* a column
+    is surrogate-keyed; the runtime says *which* codes.
+
+    Fails closed on an unmapped identifier. Minting here instead would be tempting and
+    wrong: this runs per-row inside a Spark task, so a retry or a re-partition would draw a
+    second code for the same patient and split them into two people. An identifier reaching
+    this function unmapped means the crosswalk was minted from an incomplete population, and
+    that is a pipeline bug to fix upstream, not to paper over per row.
+    """
+    if value is None or str(value).strip() == "":
+        return value
+    crosswalk = params.get("crosswalk")
+    if crosswalk is None:
+        raise ValueError(
+            "surrogate requires 'crosswalk' ({identifier: assigned_code}). Mint it with "
+            "crosswalk.mint_crosswalk() over the union of source identifiers and pass it "
+            "in -- it is runtime state, not a rulebook parameter."
+        )
+    key = str(value).strip()
+    try:
+        return crosswalk[key]
+    except KeyError:
+        raise KeyError(
+            f"No assigned code for identifier {key!r}. The crosswalk was minted from a "
+            "population that does not include this row -- re-mint over the union of ALL "
+            "source systems before de-identifying any of them."
+        ) from None
 
 
 def strat_generalize(value: Any, params: dict, pepper: str) -> Any:
@@ -240,6 +278,7 @@ STRATEGIES: dict[str, Callable[[Any, dict, str], Any]] = {
     "passthrough": strat_passthrough,
     "suppress": strat_suppress,
     "tokenize": strat_tokenize,
+    "surrogate": strat_surrogate,
     "generalize": strat_generalize,
     "date_shift": strat_date_shift,
     "synthesize": strat_synthesize,
@@ -361,12 +400,34 @@ def build_column_expr(column: str, strategy: str, params: dict, pepper: str):
     return udf(F.col(column)).alias(column)
 
 
-def deidentify_table(df, cfg: dict, profile: str, table: str, pepper: str):
+def deidentify_table(
+    df,
+    cfg: dict,
+    profile: str,
+    table: str,
+    pepper: str,
+    *,
+    runtime: dict[str, dict] | None = None,
+):
     """Apply the profile's rules to every column of a Spark DataFrame.
 
     Columns explicitly configured get their strategy; everything else gets the
     profile default (suppress). Returns a new DataFrame. Never call .show()/.display()
     on the *input* df in the de-id notebook — see docs/security_model.md leak vectors.
+
+    Parameters
+    ----------
+    runtime:
+        ``{strategy_name: extra_params}`` merged over the rulebook's parameters for that
+        strategy. This is the channel for state the rulebook *cannot* express because it
+        does not exist until run time — specifically ``surrogate``'s ``crosswalk``, which
+        is minted from the live population and passed as
+        ``{"surrogate": {"crosswalk": mapping}}``.
+
+        Keeping it out of ``cfg`` is deliberate: the rulebook is fingerprinted into every
+        audit manifest, and a per-patient mapping has no business in an artifact that gets
+        shared. The rulebook says *that* a column is surrogate-keyed; this says *which*
+        codes. Runtime values win over rulebook values on key collision.
     """
     from pyspark.sql import functions as F  # type: ignore  # noqa: F401
 
@@ -380,6 +441,9 @@ def deidentify_table(df, cfg: dict, profile: str, table: str, pepper: str):
         if strategy == "passthrough":
             select_exprs.append(F.col(column))
         else:
+            extra = (runtime or {}).get(strategy)
+            if extra:
+                params = {**params, **extra}
             select_exprs.append(build_column_expr(column, strategy, params, pepper))
     return df.select(*select_exprs)
 
