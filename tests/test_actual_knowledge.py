@@ -124,3 +124,34 @@ def test_to_dict_carries_the_defects_into_the_evidence_artifact() -> None:
     assert payload["usable"] is False
     assert payload["expired"] is True
     assert payload["defects"]
+
+
+def test_the_shipped_block_declares_what_this_pipeline_does_not_cover(shipped: dict) -> None:
+    """The modality limits must travel with the artifact, not live in a slide deck.
+
+    HIPAA compliance is a shared responsibility: the platform supplies capabilities and a
+    BAA, and the covered entity makes the determination and carries the liability. The
+    honest failure mode for an accelerator is not a wrong answer, it is silence about the
+    PHI it never looked at. DICOM pixel data, ambient voice, biometric templates and
+    full-face images are all PHI, and none of them pass through this pipeline -- so the
+    shipped attestation says so in every run manifest and every scorecard.
+    """
+    attestation = load_actual_knowledge_attestation(shipped)
+    assert attestation is not None
+    blob = " ".join(attestation.residual_risks).lower()
+    for out_of_scope in ("dicom", "voice", "biometric", "photograph"):
+        assert out_of_scope in blob, f"shipped residual_risks never mentions {out_of_scope}"
+
+
+def test_prefilled_residual_risks_do_not_sign_anything(shipped: dict) -> None:
+    """Listing risks is not attesting to them; the block must still fail closed.
+
+    ``residual_risks`` is informational and deliberately absent from ``defects()``. If it
+    ever started counting toward usability, a helpful maintainer filling in the known
+    limits would silently hand every downstream user a Safe Harbor claim nobody signed.
+    """
+    attestation = load_actual_knowledge_attestation(shipped)
+    assert attestation is not None
+    assert attestation.residual_risks, "the known limits should ship pre-filled"
+    assert not attestation.is_usable()
+    assert _attestation(residual_risks=()).is_usable(), "risks are not a usability input"

@@ -93,7 +93,63 @@ actual_knowledge:
   attested_utc: "TODO -- YYYY-MM-DD"
   expires_utc: "TODO -- YYYY-MM-DD (actual knowledge is a statement about a MOMENT; the
     estate acquires new datasets and a sound judgement in March can be wrong by September)"
-  residual_risks: []      # optional: free-text risks reviewed and consciously accepted
+
+  # ---------------------------------------------------------------------------------
+  # residual_risks is INFORMATIONAL: it is carried verbatim into the run manifest and the
+  # scorecard JSON, and it is deliberately NOT part of defects(). Filling it in does not
+  # sign anything and cannot make an unsigned attestation usable. It exists so that the
+  # limits below travel with every artefact instead of living in a slide deck.
+  #
+  # These are the risks THIS accelerator knows about and cannot resolve for you. They are
+  # pre-filled because a reviewer finding them here is better than a reviewer finding them
+  # in production. Whoever signs the block above is expected to add the risks specific to
+  # their own estate -- and to strike any of these that do not apply.
+  # ---------------------------------------------------------------------------------
+  residual_risks:
+    # -- SCOPE: what this pipeline is not ------------------------------------------
+    - "MODALITY SCOPE: this pipeline de-identifies structured and semi-structured data
+       only -- Delta table columns, and free text within those columns. It does NOT
+       process DICOM pixel data, burned-in image annotation or DICOM metadata tags;
+       ambient/voice recordings (the waveform is itself a biometric identifier under
+       164.514(b)(2)(i)(P)); stored biometric templates; full-face or comparable
+       photographs; or scanned documents and OCR output. A PHI estate containing any of
+       these needs a separate determination with separate tooling, and this run says
+       nothing about it."
+    - "IMAGE AND BIOMETRIC COLUMNS ARE POINTERS, NOT PAYLOADS: `FacePhotoURI` and
+       `BiometricTemplateID` are suppressed, which removes the REFERENCE from the
+       release. The underlying image and template stores are untouched and remain PHI.
+       Scorecard checks (P) and (Q) are recorded as not_evaluated for this reason."
+    - "FREE TEXT IS RULED COLUMN BY COLUMN: only the free-text fields enumerated in the
+       profile are suppressed or redacted. A production Epic estate carries narrative in
+       columns this rulebook has never seen, and the deny-by-default engine will halt on
+       them rather than guess -- but no detector recall claim is made for the text that
+       IS processed (see the withdrawn recall figure in NB_scorecard)."
+    # -- LINKAGE: prong (ii) judgement calls this pipeline cannot make ---------------
+    - "FACILITY GEOGRAPHY AND PROVIDER SPECIALTY SURVIVE: `dim_facility.ZIP`, `.City`,
+       `.FacilityName`, `.Region` and `dim_provider.PrimarySpecialty` pass through. These
+       are outside prong (i) by the letter -- they are not the individual's identifiers --
+       but they are the classic linkage vector: the only paediatric transplant surgeon in
+       a 3-digit ZIP identifies their patients by specialty alone. Only the covered entity
+       knows its own provider density."
+    - "INTERNAL RECORD IDENTIFIERS SURVIVE AS ASSIGNED CODES: `HSP_ACCOUNT_ID`,
+       `HospitalAccountKey`, `COVERAGE_ID`, `PatientKey` and `PatientDurableKey` pass
+       through. This is permitted under 164.514(c) because they are assigned rather than
+       derived from the individual -- but ONLY for as long as the mapping is not
+       disclosed. That is a custody condition on your source systems, not a property of
+       this output."
+    - "SURROGATE CROSSWALK CUSTODY: under a surrogate profile the crosswalk written to the
+       vault workspace is the ONLY copy of the mapping. Its access control is what keeps
+       the de-identification irreversible in practice; losing it loses re-identification,
+       and disclosing it voids the determination."
+    - "UserAgent PASSTHROUGH: `fact_portal_access.UserAgent` is retained as a device class.
+       Verified on the shipped synthetic estate at 5 distinct values across 20,027 rows
+       (smallest class 3,945). Real portal traffic carries high-entropy UA strings that are
+       a recognised fingerprinting vector -- re-measure before retaining this column."
+    # -- ESTATE: this repository's own data ------------------------------------------
+    - "SYNTHETIC DEMO ESTATE: the k-anonymity, l-diversity and t-closeness gates below
+       carry unsigned accepted-risk blocks that are valid only because no individual is
+       represented in the shipped Tonic.ai data. Pointing this pipeline at real PHI makes
+       those acceptances false statements a reviewer can see through."
 
 privacy_gates:
 
